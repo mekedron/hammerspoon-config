@@ -19,6 +19,10 @@ hs.hotkey.bind({"alt"}, "1", function()
     hs.application.launchOrFocus("Chromium")
 end)
 
+hs.hotkey.bind({"alt"}, "T", function()
+    hs.application.launchOrFocus("Telegram")
+end)
+
 hs.hotkey.bind({"alt"}, "B", function()
     hs.application.launchOrFocus("Chromium")
 end)
