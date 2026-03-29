@@ -1,6 +1,9 @@
 hs.loadSpoon("FifineDisplay")
 spoon.FifineDisplay:start()
 
+hs.loadSpoon("AudioSwitcher")
+spoon.AudioSwitcher:start()
+
 -- Window Management
 hs.hotkey.bind({"cmd", "shift"}, "2", function()
     local output = hs.execute("/opt/homebrew/bin/ocr -l eng+rus")
