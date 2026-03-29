@@ -3,15 +3,10 @@ spoon.FifineDisplay:start()
 
 -- Window Management
 hs.hotkey.bind({"cmd", "shift"}, "2", function()
-    local output = hs.execute("/opt/homebrew/bin/ocr")
-
-    -- trim whitespace/newlines
-    output = output and output:gsub("^%s*(.-)%s*$", "%1")
+    local output = hs.execute("/opt/homebrew/bin/ocr -l eng+rus")
 
     if output ~= "" then
-        hs.alert.show(output)
-    else
-        hs.alert.show("OCR returned nothing")
+        hs.pasteboard.setContents(output)
     end
 end)
 

@@ -303,7 +303,6 @@ function obj:start()
     self:_apply("startup")
   end)
 
-  hs.alert.show("FifineDisplay started")
   return self
 end
 
