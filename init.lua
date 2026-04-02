@@ -33,6 +33,9 @@ hs.hotkey.bind({"alt"}, "Z", function()
     hs.application.launchOrFocus("Zed")
 end)
 
+hs.loadSpoon("QuickActions")
+spoon.QuickActions:start()
+
 -- ä / Ä
 hs.hotkey.bind({"alt"}, "a", function()
     hs.eventtap.keyStrokes(" ä")
