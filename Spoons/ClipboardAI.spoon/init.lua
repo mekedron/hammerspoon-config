@@ -562,6 +562,17 @@ function obj:start()
 end
 
 
+--- ClipboardAI:show()
+--- Method
+--- Programmatically opens the main modal overlay.
+function obj:show()
+    if self._modal then
+        self._modal:enter()
+    end
+    return self
+end
+
+
 --- ClipboardAI:stop()
 --- Method
 --- Removes all modals and cleans up.
