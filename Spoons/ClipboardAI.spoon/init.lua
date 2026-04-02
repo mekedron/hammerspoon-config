@@ -1,41 +1,38 @@
 -------------------------------------------------------------------------------
--- QuickActions.spoon
+-- ClipboardAI.spoon
 --
--- Shows a modal overlay triggered by a hotkey, with configurable actions
--- bound to arbitrary keys. Supports sub-menus for nested choices.
+-- AI-powered clipboard processing via modal overlays.
+-- Translate, format, and chain operations on clipboard text using Claude CLI.
 --
 -- Default hotkey: Cmd+Option+V
 --
--- Built-in: [T] Translate — opens a sub-menu to translate clipboard
--- contents into English or Finnish via Claude CLI.
---
--- Translation prompts are stored in the prompts/ directory inside this Spoon.
+-- Prompts are stored in the prompts/ directory inside this Spoon.
 -------------------------------------------------------------------------------
 
 local obj = {}
 obj.__index = obj
 
-obj.name = "QuickActions"
+obj.name = "ClipboardAI"
 obj.version = "2.0"
 
-obj.log = hs.logger.new("QuickAct", "info")
+obj.log = hs.logger.new("ClipboardAI", "info")
 
---- QuickActions.hotkey
+--- ClipboardAI.hotkey
 --- Variable
 --- Table with modifiers and key for the trigger hotkey.
 obj.hotkey = { mods = {"cmd", "alt"}, key = "V" }
 
---- QuickActions.claudePath
+--- ClipboardAI.claudePath
 --- Variable
 --- Path to the claude CLI binary.
 obj.claudePath = "/opt/homebrew/bin/claude"
 
---- QuickActions.maxLineWidth
+--- ClipboardAI.maxLineWidth
 --- Variable
 --- Maximum character width for text in overlays before word-wrapping.
 obj.maxLineWidth = 120
 
---- QuickActions.actions
+--- ClipboardAI.actions
 --- Variable
 --- Ordered list of actions. Each entry is a table with:
 ---   key     (string)   - key to press (e.g. "T", "1")
@@ -480,7 +477,7 @@ function obj:_showSubmenu(submenu, title, backFn)
 end
 
 
---- QuickActions:start()
+--- ClipboardAI:start()
 --- Method
 --- Creates the modal and binds the trigger hotkey.
 function obj:start()
@@ -560,12 +557,12 @@ function obj:start()
         modal:exit()
     end)
 
-    self.log.i("QuickActions started")
+    self.log.i("ClipboardAI started")
     return self
 end
 
 
---- QuickActions:stop()
+--- ClipboardAI:stop()
 --- Method
 --- Removes all modals and cleans up.
 function obj:stop()

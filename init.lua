@@ -33,8 +33,8 @@ hs.hotkey.bind({"alt"}, "Z", function()
     hs.application.launchOrFocus("Zed")
 end)
 
-hs.loadSpoon("QuickActions")
-spoon.QuickActions:start()
+hs.loadSpoon("ClipboardAI")
+spoon.ClipboardAI:start()
 
 -- ä / Ä
 hs.hotkey.bind({"alt"}, "a", function()
