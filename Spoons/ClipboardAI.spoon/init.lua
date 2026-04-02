@@ -620,10 +620,12 @@ function obj:start()
     end)
 
     -- Alt+C: copy selection then open ClipboardAI
-    self._copyHotkey = hs.hotkey.bind({"alt"}, "C", function()
+    -- Alt+C: copy selection then open ClipboardAI
+    -- Bind on key release so Alt is no longer held when Cmd+C is simulated
+    self._copyHotkey = hs.hotkey.bind({"alt"}, "C", nil, function()
         hs.eventtap.keyStroke({"cmd"}, "c")
         hs.timer.doAfter(0.1, function()
-            self:show()
+            obj:show()
         end)
     end)
 
