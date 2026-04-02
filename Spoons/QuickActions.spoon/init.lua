@@ -30,6 +30,11 @@ obj.hotkey = { mods = {"cmd", "alt"}, key = "V" }
 --- Path to the claude CLI binary.
 obj.claudePath = "/opt/homebrew/bin/claude"
 
+--- QuickActions.maxLineWidth
+--- Variable
+--- Maximum character width for text in overlays before word-wrapping.
+obj.maxLineWidth = 120
+
 --- QuickActions.actions
 --- Variable
 --- Ordered list of actions. Each entry is a table with:
@@ -48,6 +53,35 @@ obj._originalClipboard = nil
 obj._chosenAction = nil
 obj._taskResult = nil
 obj._statusLabel = nil
+obj._history = {}
+
+
+--- Word-wraps text to maxLineWidth, breaking on spaces.
+function obj:_wrap(text)
+    local max = self.maxLineWidth
+    local result = {}
+    for line in (text .. "\n"):gmatch("(.-)\n") do
+        if #line <= max then
+            table.insert(result, line)
+        else
+            local current = ""
+            for word in line:gmatch("%S+") do
+                if current == "" then
+                    current = word
+                elseif #current + 1 + #word <= max then
+                    current = current .. " " .. word
+                else
+                    table.insert(result, current)
+                    current = word
+                end
+            end
+            if current ~= "" then
+                table.insert(result, current)
+            end
+        end
+    end
+    return table.concat(result, "\n")
+end
 
 
 --- Returns the path to this Spoon's directory.
@@ -90,6 +124,7 @@ function obj:_cancelTask()
         hs.pasteboard.setContents(self._originalClipboard)
         self._originalClipboard = nil
     end
+    self._history = {}
     hs.alert.show((self._statusLabel or "Task") .. " cancelled", 1)
     self._statusLabel = nil
 end
@@ -136,6 +171,107 @@ function obj:_tryFinish(clipboard)
 end
 
 
+--- Shows the result modal with C/V/O/M/U options.
+--- result: the processed text
+--- inputClipboard: what was in clipboard before this processing step
+--- label: status label for display
+function obj:_showResultModal(result, inputClipboard, label)
+    if self._subModal then
+        self._subModal:exit()
+        self._subModal:delete()
+    end
+
+    self._taskResult = result
+    self._chosenAction = nil
+    self._statusLabel = label
+
+    local hasHistory = #self._history > 0
+    local actionLines = "[C] Copy\n[V] Paste\n[O] Open\n[M] Modify"
+    if hasHistory then
+        actionLines = actionLines .. "\n[U] Undo"
+    end
+
+    local choice = hs.hotkey.modal.new()
+    self._subModal = choice
+
+    function choice:entered()
+        obj._alertId = hs.alert.show(
+            label .. " ready\n\n" .. obj:_wrap(result) .. "\n\n" .. actionLines .. "\n\n[Esc] Cancel",
+            { textSize = 18, radius = 12 },
+            "infinite"
+        )
+    end
+
+    function choice:exited()
+        if obj._alertId then
+            hs.alert.closeSpecific(obj._alertId)
+            obj._alertId = nil
+        end
+    end
+
+    choice:bind({}, "C", function()
+        choice:exit()
+        obj._history = {}
+        obj:_executeAction("copy", result, obj._originalClipboard)
+    end)
+
+    choice:bind({}, "V", function()
+        choice:exit()
+        obj._history = {}
+        obj:_executeAction("paste", result, obj._originalClipboard)
+    end)
+
+    choice:bind({}, "O", function()
+        choice:exit()
+        local tmpPath = os.tmpname() .. ".txt"
+        local f = io.open(tmpPath, "w")
+        if f then
+            f:write(result)
+            f:close()
+            hs.task.new("/usr/bin/open", nil, { "-a", "TextEdit", tmpPath }):start()
+        end
+        obj._taskResult = nil
+        obj._originalClipboard = nil
+        obj._statusLabel = nil
+        obj._history = {}
+    end)
+
+    choice:bind({}, "M", function()
+        choice:exit()
+        table.insert(obj._history, inputClipboard)
+        hs.pasteboard.setContents(result)
+        obj._taskResult = nil
+        -- Escape goes back to this result modal
+        obj:_showSubmenu(obj.actions, "Modify result", function()
+            table.remove(obj._history)
+            hs.pasteboard.setContents(inputClipboard)
+            obj:_showResultModal(result, inputClipboard, label)
+        end)
+    end)
+
+    if hasHistory then
+        choice:bind({}, "U", function()
+            choice:exit()
+            local prev = table.remove(obj._history)
+            hs.pasteboard.setContents(prev)
+            obj._taskResult = nil
+            if obj._task then
+                obj._task:terminate()
+                obj._task = nil
+            end
+            hs.alert.show("Undone", 1)
+            obj:_showSubmenu(obj.actions, "Quick Actions")
+        end)
+    end
+
+    choice:bind({}, "escape", function()
+        obj:_cancelTask()
+    end)
+
+    choice:enter()
+end
+
+
 --- Processes clipboard contents using Claude CLI with the given prompt.
 --- statusLabel is used in all overlay messages (e.g. "Translating", "Formatting").
 function obj:_process(promptFile, statusLabel)
@@ -154,7 +290,10 @@ function obj:_process(promptFile, statusLabel)
         return
     end
 
-    self._originalClipboard = clipboard
+    -- Preserve original clipboard across chained operations
+    if not self._originalClipboard then
+        self._originalClipboard = clipboard
+    end
     self._chosenAction = nil
     self._taskResult = nil
 
@@ -168,12 +307,18 @@ function obj:_process(promptFile, statusLabel)
         self._subModal:delete()
     end
 
+    local hasHistory = #self._history > 0
+    local actionLines = "[C] Copy\n[V] Paste\n[O] Open\n[M] Modify"
+    if hasHistory then
+        actionLines = actionLines .. "\n[U] Undo"
+    end
+
     local choice = hs.hotkey.modal.new()
     self._subModal = choice
 
     function choice:entered()
         obj._alertId = hs.alert.show(
-            label .. "...\n\n[C] Copy to clipboard\n[V] Paste & restore\n[O] Open in TextEdit\n\n[Esc] Cancel",
+            label .. "...\n\n" .. actionLines .. "\n\n[Esc] Cancel",
             { textSize = 18, radius = 12 },
             "infinite"
         )
@@ -191,13 +336,10 @@ function obj:_process(promptFile, statusLabel)
         if obj._taskResult then
             choice:exit()
         else
-            if obj._alertId then
-                hs.alert.closeSpecific(obj._alertId)
-            end
+            if obj._alertId then hs.alert.closeSpecific(obj._alertId) end
             obj._alertId = hs.alert.show(
                 label .. "...\n\nWill copy to clipboard...\n\n[Esc] Cancel",
-                { textSize = 18, radius = 12 },
-                "infinite"
+                { textSize = 18, radius = 12 }, "infinite"
             )
         end
         obj:_tryFinish(clipboard)
@@ -208,32 +350,13 @@ function obj:_process(promptFile, statusLabel)
         if obj._taskResult then
             choice:exit()
         else
-            if obj._alertId then
-                hs.alert.closeSpecific(obj._alertId)
-            end
+            if obj._alertId then hs.alert.closeSpecific(obj._alertId) end
             obj._alertId = hs.alert.show(
                 label .. "...\n\nWill paste & restore...\n\n[Esc] Cancel",
-                { textSize = 18, radius = 12 },
-                "infinite"
+                { textSize = 18, radius = 12 }, "infinite"
             )
         end
         obj:_tryFinish(clipboard)
-    end)
-
-    choice:bind({}, "O", function()
-        if not obj._taskResult then return end
-        choice:exit()
-        local tmpPath = os.tmpname() .. ".txt"
-        local f = io.open(tmpPath, "w")
-        if f then
-            f:write(obj._taskResult)
-            f:close()
-            hs.task.new("/usr/bin/open", nil, { "-a", "TextEdit", tmpPath }):start()
-        end
-        obj._taskResult = nil
-        obj._chosenAction = nil
-        obj._originalClipboard = nil
-        obj._statusLabel = nil
     end)
 
     choice:bind({}, "escape", function()
@@ -242,6 +365,7 @@ function obj:_process(promptFile, statusLabel)
 
     choice:enter()
 
+    -- Start processing in background
     local fullPrompt = prompt .. "\n\n" .. clipboard
 
     self._task = hs.task.new(self.claudePath, function(exitCode, stdout, stderr)
@@ -263,20 +387,23 @@ function obj:_process(promptFile, statusLabel)
             return
         end
 
-        obj._taskResult = result
-
-        if not obj._chosenAction then
-            if obj._alertId then
-                hs.alert.closeSpecific(obj._alertId)
+        -- If user already chose C/V, execute immediately
+        if obj._chosenAction then
+            obj._taskResult = result
+            if obj._subModal then
+                obj._subModal:exit()
+                obj._subModal:delete()
+                obj._subModal = nil
             end
-            obj._alertId = hs.alert.show(
-                label .. " ready\n\n" .. result .. "\n\n[C] Copy to clipboard\n[V] Paste & restore\n[O] Open in TextEdit\n\n[Esc] Cancel",
-                { textSize = 18, radius = 12 },
-                "infinite"
-            )
+            local action = obj._chosenAction
+            obj._chosenAction = nil
+            obj._statusLabel = nil
+            obj._history = {}
+            obj:_executeAction(action, result, obj._originalClipboard)
+        else
+            -- Show full result modal with all options
+            obj:_showResultModal(result, clipboard, label)
         end
-
-        obj:_tryFinish(clipboard)
     end, { "-p", fullPrompt })
 
     self._task:start()
@@ -284,19 +411,25 @@ end
 
 
 --- Builds overlay text for a list of actions.
-function obj:_overlayText(actions, title)
+--- preview: optional text to show above the action list.
+function obj:_overlayText(actions, title, escLabel, preview)
     local lines = { title or "Quick Actions", "" }
+    if preview and preview ~= "" then
+        table.insert(lines, self:_wrap(preview))
+        table.insert(lines, "")
+    end
     for _, action in ipairs(actions) do
         table.insert(lines, "[" .. action.key .. "] " .. action.label)
     end
     table.insert(lines, "")
-    table.insert(lines, "[Esc] Cancel")
+    table.insert(lines, "[Esc] " .. (escLabel or "Cancel"))
     return table.concat(lines, "\n")
 end
 
 
 --- Shows a sub-menu modal.
-function obj:_showSubmenu(submenu, title)
+--- backFn: optional function called on Escape instead of just closing.
+function obj:_showSubmenu(submenu, title, backFn)
     if self._subModal then
         self._subModal:exit()
         self._subModal:delete()
@@ -305,9 +438,13 @@ function obj:_showSubmenu(submenu, title)
     local sub = hs.hotkey.modal.new()
     self._subModal = sub
 
+    local overlayTitle = title or "Quick Actions"
+    local escLabel = backFn and "Back" or "Cancel"
+
     function sub:entered()
+        local preview = hs.pasteboard.getContents() or ""
         obj._alertId = hs.alert.show(
-            obj:_overlayText(submenu, title),
+            obj:_overlayText(submenu, overlayTitle, escLabel, preview),
             { textSize = 18, radius = 12 },
             "infinite"
         )
@@ -323,12 +460,20 @@ function obj:_showSubmenu(submenu, title)
     for _, action in ipairs(submenu) do
         sub:bind({}, action.key, function()
             sub:exit()
-            if action.fn then action.fn() end
+            if action.submenu then
+                -- Nested submenu: Escape goes back to this menu
+                obj:_showSubmenu(action.submenu, action.label, function()
+                    obj:_showSubmenu(submenu, title, backFn)
+                end)
+            elseif action.fn then
+                action.fn()
+            end
         end)
     end
 
     sub:bind({}, "escape", function()
         sub:exit()
+        if backFn then backFn() end
     end)
 
     sub:enter()
@@ -370,6 +515,12 @@ function obj:start()
                     { key = "3", label = "Polite tone", fn = function()
                         obj:_process("format_polite.txt", "Formatting")
                     end },
+                    { key = "4", label = "Playful tone", fn = function()
+                        obj:_process("format_playful.txt", "Formatting")
+                    end },
+                    { key = "5", label = "Biblical style", fn = function()
+                        obj:_process("format_biblical.txt", "Formatting")
+                    end },
                 },
             },
         }
@@ -379,8 +530,9 @@ function obj:start()
     self._modal = modal
 
     function modal:entered()
+        local preview = hs.pasteboard.getContents() or ""
         obj._alertId = hs.alert.show(
-            obj:_overlayText(obj.actions),
+            obj:_overlayText(obj.actions, nil, nil, preview),
             { textSize = 18, radius = 12 },
             "infinite"
         )
@@ -420,6 +572,7 @@ function obj:stop()
     self._chosenAction = nil
     self._taskResult = nil
     self._statusLabel = nil
+    self._history = {}
     if self._subModal then
         self._subModal:exit()
         self._subModal:delete()
