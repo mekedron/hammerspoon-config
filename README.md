@@ -20,7 +20,7 @@ AI-powered clipboard processing. Triggered by **Cmd+Option+V**, opens a modal ov
 
 **Format** — Fix grammar, Business tone, Polite tone, Playful tone, Biblical style
 
-**Analyze** — Brief summary
+**Analyze** — Brief summary, Explain simply
 
 After processing, choose to copy, paste, open in TextEdit, or chain another operation with Modify. Undo reverts to the previous step.
 
@@ -32,7 +32,8 @@ Prompts are stored as separate text files and can be easily customized.
 |---|---|
 | Cmd+Shift+1 | OCR screen selection + open ClipboardAI |
 | Cmd+Shift+2 | OCR screen selection to clipboard |
-| Cmd+Option+V | Open ClipboardAI |
+| Alt+V | Open ClipboardAI |
+| Alt+C | Copy selection + open ClipboardAI |
 | Alt+1 / Alt+B | Chromium |
 | Alt+T | Telegram |
 | Alt+G | Ghostty |

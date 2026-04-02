@@ -20,7 +20,7 @@ obj.log = hs.logger.new("ClipboardAI", "info")
 --- ClipboardAI.hotkey
 --- Variable
 --- Table with modifiers and key for the trigger hotkey.
-obj.hotkey = { mods = {"cmd", "alt"}, key = "V" }
+obj.hotkey = { mods = {"alt"}, key = "V" }
 
 --- ClipboardAI.claudePath
 --- Variable
@@ -32,6 +32,11 @@ obj.claudePath = "/opt/homebrew/bin/claude"
 --- Maximum character width for text in overlays before word-wrapping.
 obj.maxLineWidth = 120
 
+--- ClipboardAI.maxPreviewLines
+--- Variable
+--- Maximum number of lines shown for text preview in overlays.
+obj.maxPreviewLines = 20
+
 --- ClipboardAI.actions
 --- Variable
 --- Ordered list of actions. Each entry is a table with:
@@ -40,6 +45,8 @@ obj.maxLineWidth = 120
 ---   fn      (function) - called when the action is selected (for leaf actions)
 ---   submenu (table)    - list of sub-actions (same format), mutually exclusive with fn
 obj.actions = {}
+
+obj._alertStyle = { textSize = 18, radius = 12, atScreenEdge = 0 }
 
 obj._modal = nil
 obj._subModal = nil
@@ -51,6 +58,24 @@ obj._chosenAction = nil
 obj._taskResult = nil
 obj._statusLabel = nil
 obj._history = {}
+obj._copyHotkey = nil
+
+
+--- Word-wraps and truncates text to fit on screen.
+function obj:_preview(text)
+    local wrapped = self:_wrap(text)
+    local lines = {}
+    local count = 0
+    for line in (wrapped .. "\n"):gmatch("(.-)\n") do
+        count = count + 1
+        if count > self.maxPreviewLines then
+            table.insert(lines, "... [O] to view full text")
+            break
+        end
+        table.insert(lines, line)
+    end
+    return table.concat(lines, "\n")
+end
 
 
 --- Word-wraps text to maxLineWidth, breaking on spaces.
@@ -193,8 +218,8 @@ function obj:_showResultModal(result, inputClipboard, label)
 
     function choice:entered()
         obj._alertId = hs.alert.show(
-            label .. " ready\n\n" .. obj:_wrap(result) .. "\n\n" .. actionLines .. "\n\n[Esc] Cancel",
-            { textSize = 18, radius = 12 },
+            label .. " ready\n\n" .. obj:_preview(result) .. "\n\n" .. actionLines .. "\n\n[Esc] Cancel",
+            obj._alertStyle,
             "infinite"
         )
     end
@@ -316,7 +341,7 @@ function obj:_process(promptFile, statusLabel)
     function choice:entered()
         obj._alertId = hs.alert.show(
             label .. "...\n\n" .. actionLines .. "\n\n[Esc] Cancel",
-            { textSize = 18, radius = 12 },
+            obj._alertStyle,
             "infinite"
         )
     end
@@ -336,7 +361,7 @@ function obj:_process(promptFile, statusLabel)
             if obj._alertId then hs.alert.closeSpecific(obj._alertId) end
             obj._alertId = hs.alert.show(
                 label .. "...\n\nWill copy to clipboard...\n\n[Esc] Cancel",
-                { textSize = 18, radius = 12 }, "infinite"
+                obj._alertStyle, "infinite"
             )
         end
         obj:_tryFinish(clipboard)
@@ -350,7 +375,7 @@ function obj:_process(promptFile, statusLabel)
             if obj._alertId then hs.alert.closeSpecific(obj._alertId) end
             obj._alertId = hs.alert.show(
                 label .. "...\n\nWill paste & restore...\n\n[Esc] Cancel",
-                { textSize = 18, radius = 12 }, "infinite"
+                obj._alertStyle, "infinite"
             )
         end
         obj:_tryFinish(clipboard)
@@ -412,7 +437,7 @@ end
 function obj:_overlayText(actions, title, escLabel, preview)
     local lines = { title or "Quick Actions", "" }
     if preview and preview ~= "" then
-        table.insert(lines, self:_wrap(preview))
+        table.insert(lines, self:_preview(preview))
         table.insert(lines, "")
     end
     for _, action in ipairs(actions) do
@@ -442,7 +467,7 @@ function obj:_showSubmenu(submenu, title, backFn)
         local preview = hs.pasteboard.getContents() or ""
         obj._alertId = hs.alert.show(
             obj:_overlayText(submenu, overlayTitle, escLabel, preview),
-            { textSize = 18, radius = 12 },
+            obj._alertStyle,
             "infinite"
         )
     end
@@ -526,6 +551,9 @@ function obj:start()
                     { key = "1", label = "Brief summary", fn = function()
                         obj:_process("analyze_summary.txt", "Analyzing")
                     end },
+                    { key = "2", label = "Explain simply", fn = function()
+                        obj:_process("analyze_explain.txt", "Analyzing")
+                    end },
                 },
             },
         }
@@ -536,11 +564,11 @@ function obj:start()
 
     function modal:entered()
         local preview = hs.pasteboard.getContents() or ""
-        obj._alertId = hs.alert.show(
-            obj:_overlayText(obj.actions, nil, nil, preview),
-            { textSize = 18, radius = 12 },
-            "infinite"
-        )
+        local text = obj:_overlayText(obj.actions, nil, nil, preview)
+        -- Insert clipboard actions before [Esc]
+        text = text:gsub("\n%[Esc%]",
+            "\n[C] Copy  [V] Paste  [O] Open\n\n[Esc]")
+        obj._alertId = hs.alert.show(text, obj._alertStyle, "infinite")
     end
 
     function modal:exited()
@@ -561,8 +589,42 @@ function obj:start()
         end)
     end
 
+    -- Clipboard actions on the top-level modal
+    modal:bind({}, "C", function()
+        modal:exit()
+        hs.alert.show("Copied to clipboard", 2)
+    end)
+
+    modal:bind({}, "V", function()
+        modal:exit()
+        hs.eventtap.keyStroke({"cmd"}, "v")
+        hs.alert.show("Pasted", 2)
+    end)
+
+    modal:bind({}, "O", function()
+        modal:exit()
+        local content = hs.pasteboard.getContents() or ""
+        if content ~= "" then
+            local tmpPath = os.tmpname() .. ".txt"
+            local f = io.open(tmpPath, "w")
+            if f then
+                f:write(content)
+                f:close()
+                hs.task.new("/usr/bin/open", nil, { "-a", "TextEdit", tmpPath }):start()
+            end
+        end
+    end)
+
     modal:bind({}, "escape", function()
         modal:exit()
+    end)
+
+    -- Alt+C: copy selection then open ClipboardAI
+    self._copyHotkey = hs.hotkey.bind({"alt"}, "C", function()
+        hs.eventtap.keyStroke({"cmd"}, "c")
+        hs.timer.doAfter(0.1, function()
+            self:show()
+        end)
     end)
 
     self.log.i("ClipboardAI started")
@@ -589,6 +651,10 @@ function obj:stop()
     self._taskResult = nil
     self._statusLabel = nil
     self._history = {}
+    if self._copyHotkey then
+        self._copyHotkey:delete()
+        self._copyHotkey = nil
+    end
     if self._subModal then
         self._subModal:exit()
         self._subModal:delete()
