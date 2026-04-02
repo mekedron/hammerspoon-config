@@ -520,6 +520,14 @@ function obj:start()
                     end },
                 },
             },
+            {
+                key = "A", label = "Analyze clipboard",
+                submenu = {
+                    { key = "1", label = "Brief summary", fn = function()
+                        obj:_process("analyze_summary.txt", "Analyzing")
+                    end },
+                },
+            },
         }
     end
 

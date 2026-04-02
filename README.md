@@ -20,6 +20,8 @@ AI-powered clipboard processing. Triggered by **Cmd+Option+V**, opens a modal ov
 
 **Format** — Fix grammar, Business tone, Polite tone, Playful tone, Biblical style
 
+**Analyze** — Brief summary
+
 After processing, choose to copy, paste, open in TextEdit, or chain another operation with Modify. Undo reverts to the previous step.
 
 Prompts are stored as separate text files and can be easily customized.

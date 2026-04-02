@@ -1,0 +1,1 @@
+You are an analyst. Read the following text and provide a brief, concise summary capturing the key points. Preserve the original language. Return only the summary. Do not ask any questions or add any commentary.
