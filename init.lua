@@ -4,22 +4,25 @@ spoon.FifineDisplay:start()
 hs.loadSpoon("AudioSwitcher")
 spoon.AudioSwitcher:start()
 
+-- hs.loadSpoon("ClipboardAI")
+-- spoon.ClipboardAI:start()
+
 -- OCR
-hs.hotkey.bind({"cmd", "shift"}, "2", function()
-    local output = hs.execute("/opt/homebrew/bin/ocr -l eng+rus")
-    if output ~= "" then
-        hs.pasteboard.setContents(output)
-    end
-end)
+-- hs.hotkey.bind({"cmd", "shift"}, "2", function()
+ --    local output = hs.execute("/opt/homebrew/bin/ocr -l eng+rus")
+    -- if output ~= "" then
+       --  hs.pasteboard.setContents(output)
+    -- end
+--end)
 
 -- OCR + ClipboardAI
-hs.hotkey.bind({"cmd", "shift"}, "1", function()
-    local output = hs.execute("/opt/homebrew/bin/ocr -l eng+rus")
-    if output ~= "" then
-        hs.pasteboard.setContents(output)
-        spoon.ClipboardAI:show()
-    end
-end)
+-- hs.hotkey.bind({"cmd", "shift"}, "1", function()
+    -- local output = hs.execute("/opt/homebrew/bin/ocr -l eng+rus")
+    -- if output ~= "" then
+        -- hs.pasteboard.setContents(output)
+        -- spoon.ClipboardAI:show()
+    -- end
+-- end)
 
 hs.hotkey.bind({"alt"}, "1", function()
     hs.application.launchOrFocus("Chromium")
@@ -40,9 +43,6 @@ end)
 hs.hotkey.bind({"alt"}, "Z", function()
     hs.application.launchOrFocus("Zed")
 end)
-
-hs.loadSpoon("ClipboardAI")
-spoon.ClipboardAI:start()
 
 -- ä / Ä
 hs.hotkey.bind({"alt"}, "a", function()
