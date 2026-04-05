@@ -30,8 +30,7 @@ Prompts are stored as separate text files and can be easily customized.
 
 | Shortcut | Action |
 |---|---|
-| Cmd+Shift+1 | OCR screen selection + open ClipboardAI |
-| Cmd+Shift+2 | OCR screen selection to clipboard |
+| Cmd+Shift+1 | OCR screen selection to clipboard |
 | Alt+V | Open ClipboardAI |
 | Alt+C | Copy selection + open ClipboardAI |
 | Alt+1 / Alt+B | Chromium |
