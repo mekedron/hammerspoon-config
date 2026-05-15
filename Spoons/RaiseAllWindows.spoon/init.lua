@@ -2,21 +2,26 @@
 -- RaiseAllWindows.spoon
 --
 -- When a configured application becomes active (e.g., via Dock click or
--- Cmd+Tab), raises all of its visible windows above other apps' windows.
--- This restores the older macOS behavior where activating an app brought
--- every one of its windows to the front, not just the most recently
--- focused one.
+-- Cmd+Tab), brings all of its visible windows above other apps' windows.
+-- Restores the older macOS behavior where activating an app raised every
+-- one of its windows, not just the most recently focused one.
 --
--- Useful for terminal emulators like Ghostty where multiple windows are
--- often open and should all come forward together when switching to the
--- app.
+-- Implementation uses NSRunningApplication's activateWithOptions: with
+-- NSApplicationActivateAllWindows (exposed in Hammerspoon as
+-- hs.application:activate(true)). This is a single AppKit call that the
+-- WindowServer applies atomically, so there is no per-window AX cascade
+-- and no visible delay between window raises.
+--
+-- A per-window AXRaise fallback exists for the rare case where the
+-- AppKit call does not pick up every window (e.g., some apps with
+-- non-standard window classes).
 -------------------------------------------------------------------------------
 
 local obj = {}
 obj.__index = obj
 
 obj.name = "RaiseAllWindows"
-obj.version = "1.0"
+obj.version = "2.0"
 
 obj.log = hs.logger.new("RaiseAll", "info")
 
@@ -29,14 +34,15 @@ obj.appNames = {
     "Ghostty",
 }
 
---- RaiseAllWindows.delay
+--- RaiseAllWindows.useFallback
 --- Variable
---- Seconds to wait after an app activation before raising its windows.
---- Lets macOS finish its own window ordering first so our raises stick.
-obj.delay = 0.05
+--- If true, after the AppKit activate(true) call, also perform AXRaise on
+--- any visible windows that are still hidden behind other apps. Useful
+--- for apps where NSApplicationActivateAllWindows does not catch every
+--- window. Off by default since the AppKit path is reliable for most apps.
+obj.useFallback = false
 
 obj._watcher = nil
-obj._pendingTimer = nil
 
 
 local function inList(value, list)
@@ -63,25 +69,30 @@ end
 
 
 --- RaiseAllWindows:_raiseAll(app)
---- Internal: raises every visible standard window of `app`, then re-raises
---- the originally focused window so it stays on top.
+--- Internal: raises every visible window of `app` atomically via the
+--- AppKit "activate all windows" option.
 function obj:_raiseAll(app)
-    if not app or not app:isFrontmost() then
+    if not app then
         return
     end
 
+    -- NSRunningApplication.activateWithOptions:NSApplicationActivateAllWindows
+    -- One OS call, applied atomically by the WindowServer.
+    local ok = app:activate(true)
+    self.log.df("activate(allWindows=true) -> %s for %s", tostring(ok), app:name())
+
+    if not self.useFallback then
+        return
+    end
+
+    -- Fallback AX path for apps the AppKit call doesn't fully cover.
     local focused = app:focusedWindow()
-    local windows = app:visibleWindows()
     local focusedId = focused and focused:id() or nil
-
-    self.log.df("Raising %d windows for %s", #windows, app:name())
-
-    for _, win in ipairs(windows) do
+    for _, win in ipairs(app:visibleWindows()) do
         if win:isStandard() and win:id() ~= focusedId then
             win:raise()
         end
     end
-
     if focused and focused:isStandard() then
         focused:raise()
     end
@@ -101,14 +112,7 @@ function obj:start()
         if not self:_shouldApply(appName) then
             return
         end
-
-        if self._pendingTimer then
-            self._pendingTimer:stop()
-        end
-        self._pendingTimer = hs.timer.doAfter(self.delay, function()
-            self._pendingTimer = nil
-            self:_raiseAll(app)
-        end)
+        self:_raiseAll(app)
     end)
     self._watcher:start()
 
@@ -122,10 +126,6 @@ end
 --- Method
 --- Stops watching for application activation events.
 function obj:stop()
-    if self._pendingTimer then
-        self._pendingTimer:stop()
-        self._pendingTimer = nil
-    end
     if self._watcher then
         self._watcher:stop()
         self._watcher = nil
