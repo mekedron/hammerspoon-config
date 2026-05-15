@@ -5,7 +5,7 @@ hs.loadSpoon("AudioSwitcher")
 spoon.AudioSwitcher:start()
 
 hs.loadSpoon("RaiseAllWindows")
-spoon.RaiseAllWindows.appNames = {"Ghostty", "Finder"}
+spoon.RaiseAllWindows.appNames = {"Ghostty", "Finder", "Zed"}
 spoon.RaiseAllWindows:start()
 
 -- hs.loadSpoon("ClipboardAI")
