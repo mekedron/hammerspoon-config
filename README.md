@@ -12,6 +12,10 @@ Automatically switches audio input and output devices based on priority. When de
 
 Manages primary display and window placement based on whether the Fifine USB microphone is connected. The microphone presence indicates which laptop the shared Dell monitor is actively displaying.
 
+### RaiseAllWindows
+
+When a configured app becomes active (e.g., via Dock click or Cmd+Tab), raises all of its visible windows above other apps' windows. Restores the older macOS behavior where activating an app brought all its windows to the front, not just the most recently focused one. Defaults to Ghostty; configure `spoon.RaiseAllWindows.appNames` in `init.lua` to change the list (use `{}` for all apps).
+
 ### ClipboardAI
 
 AI-powered clipboard processing. Triggered by **Cmd+Option+V**, opens a modal overlay to translate or format clipboard text using Claude CLI.

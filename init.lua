@@ -4,6 +4,10 @@ spoon.FifineDisplay:start()
 hs.loadSpoon("AudioSwitcher")
 spoon.AudioSwitcher:start()
 
+hs.loadSpoon("RaiseAllWindows")
+spoon.RaiseAllWindows.appNames = {"Ghostty", "Finder"}
+spoon.RaiseAllWindows:start()
+
 -- hs.loadSpoon("ClipboardAI")
 -- spoon.ClipboardAI:start()
 
