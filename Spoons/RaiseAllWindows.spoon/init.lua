@@ -47,7 +47,7 @@ obj.__index = obj
 obj.name = "RaiseAllWindows"
 obj.version = "2.1"
 
-obj.log = hs.logger.new("RaiseAll", "info")
+obj.log = hs.logger.new("RaiseAll", "debug")
 
 --- RaiseAllWindows.appNames
 --- Variable
@@ -89,11 +89,18 @@ obj.userInputWindow = 0.25
 
 --- RaiseAllWindows.raiseOnClick
 --- Variable
---- If true (default), also handle clicks that don't fire an activation
---- event (e.g., clicking a window of an app that AutoRaise has already
+--- If true, also handle clicks that don't fire an activation event
+--- (e.g., clicking a window of an app that AutoRaise has already
 --- focused). After such a click, if the activated app's windows aren't
 --- already all on top, raise them together.
-obj.raiseOnClick = true
+---
+--- Defaults to false because the click attribution logic has bitten us
+--- before — dock clicks can be mis-attributed to whichever window
+--- visually lies behind the dock icon, causing a focus-steal loop. Opt
+--- in from init.lua with `spoon.RaiseAllWindows.raiseOnClick = true`
+--- once you've verified the geometry check correctly identifies
+--- system-UI clicks on your setup.
+obj.raiseOnClick = false
 
 --- RaiseAllWindows.postClickDelay
 --- Variable
@@ -166,10 +173,44 @@ function obj:_isAppFullyOnTop(app)
 end
 
 
+--- RaiseAllWindows:_isClickInSystemUI(point) -> boolean
+--- Internal: returns true if `point` is inside the menubar / dock strip
+--- of any screen. macOS reserves that strip — windows can't claim it —
+--- so a click there is targeted at system UI, not at whichever window
+--- happens to overlap that screen region in its `frame()` rect.
+--- Implemented by comparing screen:fullFrame() (full bounds including
+--- menubar and dock) with screen:frame() (the area available to apps).
+function obj:_isClickInSystemUI(point)
+    if not point then
+        return false
+    end
+    for _, s in ipairs(hs.screen.allScreens()) do
+        local full = s:fullFrame()
+        if point.x >= full.x and point.x < full.x + full.w
+           and point.y >= full.y and point.y < full.y + full.h then
+            local visible = s:frame()
+            local inVisible = point.x >= visible.x and point.x < visible.x + visible.w
+                              and point.y >= visible.y and point.y < visible.y + visible.h
+            self.log.df(
+                "systemUI? point=(%.0f,%.0f) screen='%s' full=(%.0f,%.0f %.0fx%.0f) visible=(%.0f,%.0f %.0fx%.0f) inVisible=%s -> %s",
+                point.x, point.y, s:name() or "?",
+                full.x, full.y, full.w, full.h,
+                visible.x, visible.y, visible.w, visible.h,
+                tostring(inVisible), tostring(not inVisible)
+            )
+            return not inVisible
+        end
+    end
+    self.log.df("systemUI? point=(%.0f,%.0f) on no screen -> false", point.x, point.y)
+    return false
+end
+
+
 --- RaiseAllWindows:_windowAtPoint(point) -> hs.window | nil
 --- Internal: returns the topmost standard window whose frame contains
---- `point`, or nil if the point isn't over any window (e.g., dock,
---- menubar, desktop).
+--- `point`. Caller must ensure `point` isn't in a system UI strip —
+--- inside the dock area this would return whichever window happens to
+--- extend behind the dock visually.
 function obj:_windowAtPoint(point)
     if not point then
         return nil
@@ -243,17 +284,53 @@ function obj:_startInputTap()
             return false
         end
 
-        -- Mouse click: identify the window under the cursor at click
-        -- time so later raise-decisions can be targeted to that app.
-        local hitWin = self:_windowAtPoint(event:location())
+        -- Mouse click. We have to decide:
+        --   1. Is this a click in a system-UI strip (dock/menubar)? If
+        --      so it's an app-switching action; we record it as a
+        --      non-window click (lastClickPid=0) and skip post-click.
+        --   2. Otherwise, find the window under the cursor and treat
+        --      the click as targeted at that window's app.
+        -- Geometry is the source of truth here. CGEvent's "target PID"
+        -- field is unreliable for mouse events (it tends to report the
+        -- focused app rather than the actual click target).
+        local point = event:location()
+        local pointX = point and point.x or -1
+        local pointY = point and point.y or -1
+        local inSystemUI = self:_isClickInSystemUI(point)
+        local hitWin = (not inSystemUI) and self:_windowAtPoint(point) or nil
         local hitApp = hitWin and hitWin:application()
         local hitName = hitApp and hitApp:name() or nil
-        self._lastClickAt = now
-        self._lastClickPid = hitApp and hitApp:pid() or 0
-        self._lastClickKind = hitName and ("click:" .. hitName) or "click:nowindow"
+        local hitTitle = hitWin and hitWin:title() or nil
 
-        if self.raiseOnClick and kind == et.leftMouseDown
-           and hitApp and self:_shouldApply(hitName) then
+        self._lastClickAt = now
+        if inSystemUI then
+            self._lastClickPid = 0
+            self._lastClickKind = "click:system-ui"
+        elseif hitApp then
+            self._lastClickPid = hitApp:pid()
+            self._lastClickKind = "click:" .. hitName
+        else
+            -- Click landed in the usable screen area but not inside any
+            -- standard window (e.g. desktop, popover, transient panel).
+            self._lastClickPid = 0
+            self._lastClickKind = "click:no-window"
+        end
+
+        self.log.df(
+            "click @ (%.0f,%.0f) systemUI=%s win='%s' app=%s -> lastClickPid=%d kind=%s",
+            pointX, pointY, tostring(inSystemUI),
+            hitTitle or "<nil>", hitName or "<nil>",
+            self._lastClickPid, self._lastClickKind
+        )
+
+        local schedulePostClick =
+            self.raiseOnClick
+            and kind == et.leftMouseDown
+            and not inSystemUI
+            and hitApp
+            and self:_shouldApply(hitName)
+        if schedulePostClick then
+            self.log.df("scheduling post-click for %s in %.3fs", hitName, self.postClickDelay)
             hs.timer.doAfter(self.postClickDelay, function()
                 self:_handlePostClick(hitApp)
             end)
