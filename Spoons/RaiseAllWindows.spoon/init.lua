@@ -21,13 +21,15 @@
 -- user didn't intend to bring the app forward. We can't tell the two
 -- cases apart from the watcher event itself, so we look at the most
 -- recent INPUT event instead:
---   * A real activation is preceded by a click (dock, window, menu bar)
---     or a modified keypress (Cmd+Tab, Alt+G hotkey, etc).
---   * An AutoRaise activation is preceded only by mouse motion, which
---     we don't track.
--- If no qualifying input event happened within `userInputWindow` seconds
--- before the activation, we treat it as an AutoRaise hover and skip the
--- raise-all.
+--   * A real activation is preceded by a click that landed on this app's
+--     window (or on no window — dock, menubar, desktop), or by a
+--     modified keypress (Cmd+Tab, Alt+G hotkey, etc).
+--   * An AutoRaise activation, or a re-activation triggered by our own
+--     activate(true), is preceded only by mouse motion or by a click on
+--     a different app's window — neither of which authorizes a raise.
+-- The check is targeted to avoid the loop where a click on app A (e.g.
+-- the Hammerspoon Console) would authorize raises of app B (e.g. Ghostty)
+-- when our activate(true) re-fires the activation watcher.
 --
 -- A second trap: once AutoRaise has focused an app (without raising
 -- siblings), a later click on one of that app's windows does NOT fire a
@@ -45,7 +47,7 @@ obj.__index = obj
 obj.name = "RaiseAllWindows"
 obj.version = "2.1"
 
-obj.log = hs.logger.new("RaiseAll", "debug")
+obj.log = hs.logger.new("RaiseAll", "info")
 
 --- RaiseAllWindows.appNames
 --- Variable
@@ -66,18 +68,23 @@ obj.useFallback = false
 
 --- RaiseAllWindows.requireUserInput
 --- Variable
---- If true (default), only raise-all when a click or modified keypress
---- happened within `userInputWindow` seconds before the activation event.
---- Activations triggered solely by mouse motion (AutoRaise hover) have no
---- qualifying preceding input, so they get skipped.
+--- If true (default), only raise-all when an authorizing input happened
+--- within `userInputWindow` seconds. Authorizing means either:
+---   * A modified keypress (any app — Cmd+Tab is intrinsically untargeted)
+---   * A click whose target was either this app's own window or no
+---     window at all (dock / menubar / desktop are all attributable to
+---     the user choosing some app to bring forward).
+--- A click on a *different* app's window does NOT authorize, which is
+--- what stops the self-sustaining raise loop when activate(true) re-fires
+--- the activation watcher.
 obj.requireUserInput = true
 
 --- RaiseAllWindows.userInputWindow
 --- Variable
---- How long (in seconds) a click or modified keypress remains valid as
---- evidence of user-initiated activation. 250 ms is comfortably longer
---- than the delay between a click/hotkey and the activation event, but
---- short enough that stale input doesn't authorize later AutoRaise events.
+--- How long (in seconds) an authorizing input remains valid. 250 ms is
+--- longer than typical OS delay between a click/hotkey and the
+--- activation event, but short enough that stale input doesn't authorize
+--- later unrelated activations.
 obj.userInputWindow = 0.25
 
 --- RaiseAllWindows.raiseOnClick
@@ -90,15 +97,26 @@ obj.raiseOnClick = true
 
 --- RaiseAllWindows.postClickDelay
 --- Variable
---- Seconds to wait after a left-click before checking which window came
---- to the front. The OS needs a moment to process the click and update
---- z-order before our read returns the post-click state.
+--- Seconds to wait after a left-click before deciding whether the
+--- siblings need raising. The OS needs a moment to process the click and
+--- update z-order before our `_isAppFullyOnTop` read is meaningful.
 obj.postClickDelay = 0.08
+
+--- RaiseAllWindows.raiseCooldown
+--- Variable
+--- Minimum seconds between two raise-alls for the same app. Acts as a
+--- hard floor against feedback loops where activate(true) keeps re-firing
+--- the activation watcher.
+obj.raiseCooldown = 0.3
 
 obj._watcher = nil
 obj._inputTap = nil
-obj._lastUserInputAt = 0
-obj._lastUserInputKind = "none"
+obj._lastClickAt = 0
+obj._lastClickPid = 0
+obj._lastClickKind = "none"
+obj._lastKeyAt = 0
+obj._lastKeyKind = "none"
+obj._lastRaiseAt = {}
 
 
 local function inList(value, list)
@@ -148,26 +166,39 @@ function obj:_isAppFullyOnTop(app)
 end
 
 
---- RaiseAllWindows:_handlePostClick()
---- Internal: called shortly after a left-click. If the now-frontmost
---- window is in a configured app whose siblings are NOT already at the
---- top, raise them. This covers the case where AutoRaise focused the app
---- earlier (no activation event fires when clicking inside an already-
---- active app), so the activation watcher never gets a chance.
-function obj:_handlePostClick()
-    local front = hs.window.frontmostWindow()
-    if not front then
-        return
+--- RaiseAllWindows:_windowAtPoint(point) -> hs.window | nil
+--- Internal: returns the topmost standard window whose frame contains
+--- `point`, or nil if the point isn't over any window (e.g., dock,
+--- menubar, desktop).
+function obj:_windowAtPoint(point)
+    if not point then
+        return nil
     end
-    local app = front:application()
-    if not app then
+    for _, w in ipairs(hs.window.orderedWindows()) do
+        if w:isStandard() then
+            local f = w:frame()
+            if f
+               and point.x >= f.x and point.x < f.x + f.w
+               and point.y >= f.y and point.y < f.y + f.h then
+                return w
+            end
+        end
+    end
+    return nil
+end
+
+
+--- RaiseAllWindows:_handlePostClick(app)
+--- Internal: called shortly after a left-click on a window of `app` (the
+--- app under the cursor at click time). If `app`'s siblings aren't
+--- already on top, raise them. This covers the case where AutoRaise had
+--- already focused the app, so the click doesn't fire an activation
+--- event and the watcher never gets a chance.
+function obj:_handlePostClick(app)
+    if not app or not app:isRunning() then
         return
     end
     local name = app:name()
-    if not self:_shouldApply(name) then
-        self.log.df("post-click: '%s' not in list, skip", tostring(name))
-        return
-    end
     if self:_isAppFullyOnTop(app) then
         self.log.df("post-click: %s already fully on top, skip", name)
         return
@@ -194,7 +225,8 @@ function obj:_startInputTap()
     }
     self._inputTap = hs.eventtap.new(watched, function(event)
         local kind = event:getType()
-        local label
+        local now = hs.timer.secondsSinceEpoch()
+
         if kind == et.keyDown then
             -- Plain typing shouldn't count — only modifier-bearing presses
             -- (Cmd+Tab, Hammerspoon Alt+X hotkeys, Ctrl-based switchers).
@@ -202,23 +234,28 @@ function obj:_startInputTap()
             if not (flags.cmd or flags.alt or flags.ctrl) then
                 return false
             end
-            label = "keyDown"
+            local label = "keyDown"
             if flags.cmd then label = label .. "+cmd" end
             if flags.alt then label = label .. "+alt" end
             if flags.ctrl then label = label .. "+ctrl" end
-        elseif kind == et.leftMouseDown then
-            label = "leftMouseDown"
-        elseif kind == et.rightMouseDown then
-            label = "rightMouseDown"
-        else
-            label = "otherMouseDown"
+            self._lastKeyAt = now
+            self._lastKeyKind = label
+            return false
         end
-        self._lastUserInputAt = hs.timer.secondsSinceEpoch()
-        self._lastUserInputKind = label
 
-        if self.raiseOnClick and kind == et.leftMouseDown then
+        -- Mouse click: identify the window under the cursor at click
+        -- time so later raise-decisions can be targeted to that app.
+        local hitWin = self:_windowAtPoint(event:location())
+        local hitApp = hitWin and hitWin:application()
+        local hitName = hitApp and hitApp:name() or nil
+        self._lastClickAt = now
+        self._lastClickPid = hitApp and hitApp:pid() or 0
+        self._lastClickKind = hitName and ("click:" .. hitName) or "click:nowindow"
+
+        if self.raiseOnClick and kind == et.leftMouseDown
+           and hitApp and self:_shouldApply(hitName) then
             hs.timer.doAfter(self.postClickDelay, function()
-                self:_handlePostClick()
+                self:_handlePostClick(hitApp)
             end)
         end
 
@@ -245,25 +282,36 @@ function obj:_raiseAll(app)
         return
     end
 
+    local pid = app:pid()
+    local now = hs.timer.secondsSinceEpoch()
+
     if self.requireUserInput then
-        local now = hs.timer.secondsSinceEpoch()
-        local delta = now - self._lastUserInputAt
-        self.log.df(
-            "input check for %s: lastKind=%s lastAt=%.3fs ago window=%.3fs",
-            app:name(), self._lastUserInputKind, delta, self.userInputWindow
-        )
-        if delta > self.userInputWindow then
+        local keyAgo = now - self._lastKeyAt
+        local clickAgo = now - self._lastClickAt
+        local recentKey = keyAgo <= self.userInputWindow
+        local clickTargetsThisApp = self._lastClickPid == pid or self._lastClickPid == 0
+        local recentClickAuthorizes = clickAgo <= self.userInputWindow and clickTargetsThisApp
+        if not (recentKey or recentClickAuthorizes) then
             self.log.i(string.format(
-                "SKIP raise for %s: no recent user input (%.3fs since last %s)",
-                app:name(), delta, self._lastUserInputKind
+                "SKIP raise for %s: no authorizing input (key %.2fs ago [%s], click %.2fs ago [%s, pid=%d vs appPid=%d])",
+                app:name(), keyAgo, self._lastKeyKind, clickAgo, self._lastClickKind,
+                self._lastClickPid, pid
             ))
             return
         end
     end
 
+    local lastAt = self._lastRaiseAt[pid] or 0
+    local sinceLast = now - lastAt
+    if sinceLast < self.raiseCooldown then
+        self.log.df("cooldown: %s raised %.2fs ago, skip", app:name(), sinceLast)
+        return
+    end
+
     -- NSRunningApplication.activateWithOptions:NSApplicationActivateAllWindows
     -- One OS call, applied atomically by the WindowServer.
     local ok = app:activate(true)
+    self._lastRaiseAt[pid] = hs.timer.secondsSinceEpoch()
     self.log.i(string.format("RAISE all windows for %s (activate ok=%s)", app:name(), tostring(ok)))
 
     if not self.useFallback then
