@@ -18,6 +18,13 @@ When a configured app becomes active (e.g., via Dock click or Cmd+Tab), raises a
 
 Uses AppKit's `NSApplicationActivateAllWindows` option for a single atomic OS-level call — no per-window cascade or AX delay. A per-window AXRaise fallback is available via `spoon.RaiseAllWindows.useFallback = true` for apps the AppKit call doesn't fully cover.
 
+Plays nicely with [AutoRaise](https://github.com/sbmpost/AutoRaise) via two complementary checks:
+
+- `spoon.RaiseAllWindows.requireUserInput = true` (default): only raise on activation when a click or modified keypress (Cmd+Tab, the Alt-prefixed launcher hotkeys, etc.) happened within `userInputWindow` seconds (default 0.25). AutoRaise hovers are pure mouse motion, so they don't qualify and get skipped.
+- `spoon.RaiseAllWindows.raiseOnClick = true` (default): after AutoRaise has focused an app, clicking a window of that already-active app doesn't fire a new activation event. The spoon hooks left-clicks too: a short delay (`postClickDelay`, default 0.08 s) after the click, if the clicked window belongs to a configured app whose siblings are still behind other apps, it raises them as well.
+
+Set either flag to `false` to disable that half of the behavior.
+
 ### ClipboardAI
 
 AI-powered clipboard processing. Triggered by **Cmd+Option+V**, opens a modal overlay to translate or format clipboard text using Claude CLI.
