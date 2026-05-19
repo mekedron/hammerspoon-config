@@ -4,10 +4,10 @@
 -- Manages primary display and window placement based on the connection state
 -- of a Fifine USB microphone.
 --
--- Context: A Dell monitor (2560x1440) is shared between two laptops using
--- different input sources (HDMI for this Mac, DisplayPort for the other).
--- The Fifine microphone is USB-connected to this Mac, so its presence
--- indicates that the Dell monitor is actively displaying this Mac's output.
+-- Context: A Dell monitor is shared between two laptops using different input
+-- sources (HDMI for this Mac, DisplayPort for the other). The Fifine
+-- microphone is USB-connected to this Mac, so its presence indicates that the
+-- Dell monitor is actively displaying this Mac's output.
 --
 -- Behavior:
 --   Microphone connected   -> Dell is the active display for this Mac
@@ -37,11 +37,6 @@ obj.targetUSBSubstring = "fifine"
 -- Screen name identifiers (case-insensitive substrings)
 obj.externalNameSubstring = "dell"
 obj.internalNameSubstring = "built-in"
-
--- Expected resolution of the external Dell monitor, used to disambiguate
--- in case multiple displays match the name substring
-obj.targetWidth = 2560
-obj.targetHeight = 1440
 
 -- Watchers and timers (managed by start/stop lifecycle)
 obj.usbWatcher = nil      -- Monitors USB connect/disconnect events
@@ -82,17 +77,13 @@ end
 
 
 --- Finds the external Dell screen among all connected displays.
---- Matches by name substring AND expected resolution to avoid false positives.
+--- Matches by name substring only; assumes a single Dell is connected at a time.
 --- Returns the hs.screen object or nil if not found.
 function obj:_findExternalScreen()
   for _, screen in ipairs(hs.screen.allScreens()) do
     local name = normalized(screen:name())
-    local mode = screen:currentMode()
-
-    if name:find(self.externalNameSubstring, 1, true) and mode then
-      if mode.w == self.targetWidth and mode.h == self.targetHeight then
-        return screen
-      end
+    if name:find(self.externalNameSubstring, 1, true) then
+      return screen
     end
   end
   return nil
