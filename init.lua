@@ -1,5 +1,5 @@
-hs.loadSpoon("FifineDisplay")
-spoon.FifineDisplay:start()
+hs.loadSpoon("PrimaryDisplay")
+spoon.PrimaryDisplay:start()
 
 hs.loadSpoon("AudioSwitcher")
 spoon.AudioSwitcher:start()

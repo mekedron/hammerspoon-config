@@ -9,7 +9,7 @@
 -- names don't need to be exact -- just unique enough to identify the device.
 --
 -- Default priorities:
---   Input:  Fifine mic > MacBook Pro Microphone
+--   Input:  USB microphone > MacBook Pro Microphone
 --   Output: USB-C to 3.5mm adapter > External Headphones > MacBook Pro Speakers
 -------------------------------------------------------------------------------
 
@@ -26,6 +26,8 @@ obj.log = hs.logger.new("AudioSwitch", "info")
 --- Ordered list of input device name patterns (case-insensitive, partial match).
 --- First available match wins.
 obj.inputPriority = {
+    -- "fifine" is the macOS-reported device name of the USB mic ("fifine
+    -- Microphone"); this is a match pattern, not a label, so it must stay literal.
     "fifine",
     "macbook pro microphone",
 }

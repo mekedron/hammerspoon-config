@@ -1,20 +1,22 @@
 -------------------------------------------------------------------------------
--- FifineDisplay.spoon
+-- PrimaryDisplay.spoon
 --
 -- Manages primary display and window placement based on the connection state
--- of a Fifine USB microphone.
+-- of a USB "presence" device -- by default the ZSA keyboard.
 --
 -- Context: A Dell monitor is shared between two laptops using different input
--- sources (HDMI for this Mac, DisplayPort for the other). The Fifine
--- microphone is USB-connected to this Mac, so its presence indicates that the
--- Dell monitor is actively displaying this Mac's output.
+-- sources (HDMI for this Mac, DisplayPort for the other). The ZSA keyboard is
+-- USB-connected to this Mac, so its presence indicates that this Mac is the
+-- one actively driving the Dell monitor. (The keyboard is a more reliable
+-- signal than the USB microphone, which sometimes gets moved to the other
+-- laptop while the keyboard and external screen stay with this Mac.)
 --
 -- Behavior:
---   Microphone connected   -> Dell is the active display for this Mac
---                           -> Set Dell as primary screen
---   Microphone disconnected -> Dell switched to the other laptop's input
---                           -> Set built-in screen as primary
---                           -> Move all windows to the built-in screen
+--   Keyboard connected    -> Dell is the active display for this Mac
+--                         -> Set Dell as primary screen
+--   Keyboard disconnected -> Dell switched to the other laptop's input
+--                         -> Set built-in screen as primary
+--                         -> Move all windows to the built-in screen
 --
 -- The spoon monitors both USB events and screen configuration changes,
 -- with debounced scheduling to handle rapid successive events. Window
@@ -25,15 +27,17 @@
 local obj = {}
 obj.__index = obj
 
-obj.name = "FifineDisplay"
-obj.version = "3.0"
+obj.name = "PrimaryDisplay"
+obj.version = "4.0"
 obj.author = "OpenAI"
 
 -- Logger for debugging display/USB events (Console.app or hs.openConsole())
-obj.log = hs.logger.new("FifineDisp", "info")
+obj.log = hs.logger.new("PrimaryDisp", "info")
 
--- USB device identifier: matches against product/vendor name (case-insensitive)
-obj.targetUSBSubstring = "fifine"
+-- USB device identifier: matches against product/vendor name (case-insensitive).
+-- Default "zsa" matches the ZSA keyboard's vendor name ("ZSA Technology Labs"),
+-- so it works across ZSA models (Moonlander, Voyager, ErgoDox EZ, ...).
+obj.targetUSBSubstring = "zsa"
 -- Screen name identifiers (case-insensitive substrings)
 obj.externalNameSubstring = "dell"
 obj.internalNameSubstring = "built-in"
@@ -53,8 +57,8 @@ local function normalized(s)
 end
 
 
---- Checks whether a USB device event matches the Fifine microphone
---- by searching both productName and vendorName.
+--- Checks whether a USB device event matches the target presence device
+--- (the ZSA keyboard) by searching both productName and vendorName.
 function obj:_usbMatches(device)
   local product = normalized(device.productName)
   local vendor = normalized(device.vendorName)
@@ -64,9 +68,9 @@ function obj:_usbMatches(device)
 end
 
 
---- Scans all currently attached USB devices to check if a Fifine device
---- is present. Returns true if found, false otherwise.
-function obj:_isFifineAttached()
+--- Scans all currently attached USB devices to check if the target
+--- presence device is present. Returns true if found, false otherwise.
+function obj:_isTargetAttached()
   for _, dev in ipairs(hs.usb.attachedDevices() or {}) do
     if self:_usbMatches(dev) then
       return true
@@ -183,24 +187,24 @@ function obj:_scheduleMoveWindows()
 end
 
 
---- Core logic: determines the desired state based on Fifine microphone
---- presence and applies the appropriate primary screen setting.
+--- Core logic: determines the desired state based on the target presence
+--- device (ZSA keyboard) and applies the appropriate primary screen setting.
 ---
---- When Fifine is attached:
+--- When the keyboard is attached:
 ---   Dell is displaying this Mac -> make Dell primary
---- When Fifine is detached:
+--- When the keyboard is detached:
 ---   Dell switched to other input -> make built-in primary
 ---   Move all windows to built-in (with retries for timing)
 function obj:_apply(reason)
-  local fifine = self:_isFifineAttached()
+  local attached = self:_isTargetAttached()
   local external = self:_findExternalScreen()
   local internal = self:_findInternalScreen()
   local currentPrimary = hs.screen.primaryScreen()
 
   self.log.i(string.format(
-    "apply reason=%s fifine=%s external=%s internal=%s currentPrimary=%s",
+    "apply reason=%s attached=%s external=%s internal=%s currentPrimary=%s",
     tostring(reason),
-    tostring(fifine),
+    tostring(attached),
     external and external:name() or "nil",
     internal and internal:name() or "nil",
     currentPrimary and currentPrimary:name() or "nil"
@@ -208,8 +212,8 @@ function obj:_apply(reason)
 
   self:_debugScreens("debug")
 
-  if fifine then
-    -- Microphone present: Dell is on HDMI for this Mac -> make it primary
+  if attached then
+    -- Keyboard present: Dell is on HDMI for this Mac -> make it primary
     self:_cancelMoveTimers()
     if external and currentPrimary ~= external then
       self.log.i("Switching primary -> external")
@@ -217,7 +221,7 @@ function obj:_apply(reason)
       self.log.i("external:setPrimary() -> " .. tostring(ok))
     end
   else
-    -- Microphone absent: Dell switched to other laptop -> use built-in
+    -- Keyboard absent: Dell switched to other laptop -> use built-in
     if internal then
       if currentPrimary ~= internal then
         self.log.i("Switching primary -> internal")
@@ -256,7 +260,7 @@ end
 function obj:start()
   self:stop()
 
-  -- Watch for USB connect/disconnect events matching the Fifine microphone
+  -- Watch for USB connect/disconnect events matching the presence device
   self.usbWatcher = hs.usb.watcher.new(function(event)
     if not self:_usbMatches(event) then
       return
@@ -287,7 +291,7 @@ function obj:start()
   self.screenWatcher:start()
 
   -- Apply initial state after a short delay to let the system settle on startup.
-  -- This handles the case where Hammerspoon is reloaded while the microphone is
+  -- This handles the case where Hammerspoon is reloaded while the keyboard is
   -- already connected or disconnected.
   self.startTimer = hs.timer.doAfter(2, function()
     self.startTimer = nil

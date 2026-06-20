@@ -8,9 +8,9 @@ Personal Hammerspoon configuration for macOS automation.
 
 Automatically switches audio input and output devices based on priority. When devices are connected or disconnected, the highest-priority available device is selected.
 
-### FifineDisplay
+### PrimaryDisplay
 
-Manages primary display and window placement based on whether the Fifine USB microphone is connected. The microphone presence indicates which laptop the shared Dell monitor is actively displaying.
+Manages primary display and window placement based on whether a USB "presence" device — by default the ZSA keyboard — is connected. The keyboard's presence indicates which laptop the shared Dell monitor is actively displaying: when it's plugged into this Mac, the Dell is set as primary; when it's unplugged (taken to the other laptop), the built-in screen becomes primary and all windows are moved back to it. The match device is configurable via `spoon.PrimaryDisplay.targetUSBSubstring` (default `"zsa"`, which matches any ZSA keyboard model by vendor name).
 
 ### RaiseAllWindows
 
