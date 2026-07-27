@@ -20,21 +20,23 @@ spoon.MiddleClickRightOption.suppressMiddleClick = true
 -- layers). Re-enable by uncommenting the line below.
 -- spoon.MiddleClickRightOption:start()
 
-hs.loadSpoon("MouseLayers")
+-- Disabled: mouse modifier layers are not in active use. Re-enable by
+-- uncommenting the block below.
+-- hs.loadSpoon("MouseLayers")
 -- Side-button numbers (vary by mouse; common 5-button convention is back=3,
 -- forward=4). With logButtons = true, reload and click each side button to see
 -- its number in the Hammerspoon console, then set these and turn logging off.
-spoon.MouseLayers.backButton = 3
-spoon.MouseLayers.forwardButton = 4
-spoon.MouseLayers.logButtons = true
+-- spoon.MouseLayers.backButton = 3
+-- spoon.MouseLayers.forwardButton = 4
+-- spoon.MouseLayers.logButtons = true
 -- A single side-button click passes through as the normal browser back/forward
 -- after this delay; a fast second click fires its key (forward=Enter,
 -- back=Escape) instead. Raise it if double-clicks aren't being caught.
-spoon.MouseLayers.doubleClickInterval = 0.25
+-- spoon.MouseLayers.doubleClickInterval = 0.25
 -- Key auto-repeat while a side button is held and you click a main button.
-spoon.MouseLayers.repeatDelay = 0.4
-spoon.MouseLayers.repeatInterval = 0.05
-spoon.MouseLayers:start()
+-- spoon.MouseLayers.repeatDelay = 0.4
+-- spoon.MouseLayers.repeatInterval = 0.05
+-- spoon.MouseLayers:start()
 
 -- hs.loadSpoon("ClipboardAI")
 -- spoon.ClipboardAI:start()

@@ -40,6 +40,8 @@ A stuck-modifier safety net (`maxHoldSeconds`, default `30`, `0` to disable) for
 
 ### MouseLayers
 
+> Currently disabled in `init.lua` (not in active use); re-enable by uncommenting its block.
+
 Gives the mouse's **side buttons** (normally web back/forward) three roles each, without losing their everyday navigation:
 
 - **Single click** → the normal back/forward navigation (replayed after `doubleClickInterval`, so there's a small, deliberate delay).
