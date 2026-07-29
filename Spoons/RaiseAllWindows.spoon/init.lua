@@ -258,10 +258,16 @@ function obj:_startInputTap()
         return
     end
     local et = hs.eventtap.event.types
+    -- Middle / side buttons (otherMouseDown) are deliberately NOT watched.
+    -- This callback runs synchronously inside the event tap and does a full
+    -- `hs.window.orderedWindows()` AX sweep, which holds the click back by
+    -- tens of milliseconds. Apps that drive interaction from the middle
+    -- button (Blender's orbit is middle-drag) feel that as input lag, and
+    -- those buttons never trigger the raise-all path anyway — post-click
+    -- raising is gated on leftMouseDown.
     local watched = {
         et.leftMouseDown,
         et.rightMouseDown,
-        et.otherMouseDown,
         et.keyDown,
     }
     self._inputTap = hs.eventtap.new(watched, function(event)

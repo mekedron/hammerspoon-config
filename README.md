@@ -25,6 +25,8 @@ Plays nicely with [AutoRaise](https://github.com/sbmpost/AutoRaise) via two comp
 
 Set either flag to `false` to disable that half of the behavior.
 
+The click tap watches left- and right-clicks only. Middle and side buttons pass through untouched, because the tap's callback runs synchronously and does a full window-geometry sweep — enough to add visible input lag to apps that drive interaction from the middle button (Blender orbits on middle-drag).
+
 ### MiddleClickRightOption
 
 > Currently disabled in `init.lua` (superseded by **MouseLayers** below); re-enable by uncommenting its `:start()` line.
