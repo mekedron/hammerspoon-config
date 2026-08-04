@@ -57,29 +57,31 @@ spoon.MiddleClickRightOption.suppressMiddleClick = true
 --     end
 -- end)
 
-hs.hotkey.bind({"alt"}, "1", function()
-    hs.application.launchOrFocus("Chromium")
-end)
+-- Disabled: Option-key app launchers. Re-enable by uncommenting the blocks
+-- below.
+-- hs.hotkey.bind({"alt"}, "1", function()
+--     hs.application.launchOrFocus("Chromium")
+-- end)
 
-hs.hotkey.bind({"alt"}, "2", function()
-    hs.application.launchOrFocus("Google Chrome")
-end)
+-- hs.hotkey.bind({"alt"}, "2", function()
+--     hs.application.launchOrFocus("Google Chrome")
+-- end)
 
-hs.hotkey.bind({"alt"}, "T", function()
-    hs.application.launchOrFocus("Telegram")
-end)
+-- hs.hotkey.bind({"alt"}, "T", function()
+--     hs.application.launchOrFocus("Telegram")
+-- end)
 
-hs.hotkey.bind({"alt"}, "B", function()
-    hs.application.launchOrFocus("Chromium")
-end)
+-- hs.hotkey.bind({"alt"}, "B", function()
+--     hs.application.launchOrFocus("Chromium")
+-- end)
 
-hs.hotkey.bind({"alt"}, "G", function()
-    hs.application.launchOrFocus("Ghostty")
-end)
+-- hs.hotkey.bind({"alt"}, "G", function()
+--     hs.application.launchOrFocus("Ghostty")
+-- end)
 
-hs.hotkey.bind({"alt"}, "Z", function()
-    hs.application.launchOrFocus("Zed")
-end)
+-- hs.hotkey.bind({"alt"}, "Z", function()
+--     hs.application.launchOrFocus("Zed")
+-- end)
 
 -- ä / Ä
 hs.hotkey.bind({"alt"}, "a", function()

@@ -90,10 +90,11 @@ Prompts are stored as separate text files and can be easily customized.
 | Cmd+Shift+1 | OCR screen selection to clipboard |
 | Alt+V | Open ClipboardAI |
 | Alt+C | Copy selection + open ClipboardAI |
-| Alt+1 / Alt+B | Chromium |
-| Alt+T | Telegram |
-| Alt+G | Ghostty |
-| Alt+Z | Zed |
+| Alt+1 / Alt+B | Chromium (disabled) |
+| Alt+2 | Google Chrome (disabled) |
+| Alt+T | Telegram (disabled) |
+| Alt+G | Ghostty (disabled) |
+| Alt+Z | Zed (disabled) |
 | Alt+A | Type ä |
 | Alt+Shift+A | Type Ä |
 | Alt+O | Type ö |
