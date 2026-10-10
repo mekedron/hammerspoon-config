@@ -12,6 +12,16 @@ Automatically switches audio input and output devices based on priority. When de
 
 Manages primary display and window placement based on whether a USB "presence" device — by default the ZSA keyboard — is connected. The keyboard's presence indicates which laptop the shared Dell monitor is actively displaying: when it's plugged into this Mac, the Dell is set as primary; when it's unplugged (taken to the other laptop), the built-in screen becomes primary and all windows are moved back to it. The match device is configurable via `spoon.PrimaryDisplay.targetUSBSubstring` (default `"zsa"`, which matches any ZSA keyboard model by vendor name).
 
+### VolumeDuck
+
+Push-to-duck: hold **Control + Option** (and nothing else) and the system output volume drops to 10%, so every sound source gets quieter at once; release either key and the previous volume comes back. A volume already at or below the duck level is left alone.
+
+Ctrl+Option is also a shortcut prefix, so ducking waits until the combo has been held alone for `holdDelay` seconds (default `0.15`) — a quick Ctrl+Option+<key> doesn't dip the sound. Pressing any other key while ducked restores the volume at once, and the combo stays inert until both modifiers are released.
+
+macOS has no per-app volume, so this ducks the default output device. Outputs without a software volume control (most HDMI / DisplayPort) are skipped. The volume is restored on the device that was ducked even if the default output switches mid-hold, and a pre-duck volume left behind by a reload or crash is restored on the next start.
+
+Knobs in `init.lua`: `duckVolume` (default `10`), `holdDelay` (default `0.15`), `pollInterval` (default `0.5`, the fallback re-check of the real modifier state while ducked).
+
 ### RaiseAllWindows
 
 When a configured app becomes active (e.g., via Dock click or Cmd+Tab), raises all of its visible windows above other apps' windows. Restores the older macOS behavior where activating an app brought all its windows to the front, not just the most recently focused one. Defaults to Ghostty; configure `spoon.RaiseAllWindows.appNames` in `init.lua` to change the list (use `{}` for all apps).
@@ -88,6 +98,7 @@ Prompts are stored as separate text files and can be easily customized.
 | Shortcut | Action |
 |---|---|
 | Cmd+Shift+1 | OCR screen selection to clipboard |
+| Hold Ctrl+Alt | Duck output volume to 10% (VolumeDuck) |
 | Alt+V | Open ClipboardAI |
 | Alt+C | Copy selection + open ClipboardAI |
 | Alt+1 / Alt+B | Chromium (disabled) |

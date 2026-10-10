@@ -4,6 +4,11 @@ spoon.PrimaryDisplay:start()
 hs.loadSpoon("AudioSwitcher")
 spoon.AudioSwitcher:start()
 
+hs.loadSpoon("VolumeDuck")
+-- Output volume (percent) while Ctrl+Option is held.
+spoon.VolumeDuck.duckVolume = 10
+spoon.VolumeDuck:start()
+
 hs.loadSpoon("RaiseAllWindows")
 spoon.RaiseAllWindows.appNames = {"Ghostty", "Finder", "Zed"}
 spoon.RaiseAllWindows:start()
