@@ -37,7 +37,7 @@ obj.log = hs.logger.new("VolumeDuck", "info")
 --- Variable
 --- Output volume (0-100) while the combo is held. A volume already at or below
 --- this level is left unchanged, so ducking never makes anything louder.
-obj.duckVolume = 10
+obj.duckVolume = 20
 
 --- VolumeDuck.holdDelay
 --- Variable

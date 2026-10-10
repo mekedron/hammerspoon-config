@@ -14,13 +14,13 @@ Manages primary display and window placement based on whether a USB "presence" d
 
 ### VolumeDuck
 
-Push-to-duck: hold **Control + Option** (and nothing else) and the system output volume drops to 10%, so every sound source gets quieter at once; release either key and the previous volume comes back. A volume already at or below the duck level is left alone.
+Push-to-duck: hold **Control + Option** (and nothing else) and the system output volume drops to 20%, so every sound source gets quieter at once; release either key and the previous volume comes back. A volume already at or below the duck level is left alone.
 
 Ctrl+Option is also a shortcut prefix, so ducking waits until the combo has been held alone for `holdDelay` seconds (default `0.15`) — a quick Ctrl+Option+<key> doesn't dip the sound. Pressing any other key while ducked restores the volume at once, and the combo stays inert until both modifiers are released.
 
 macOS has no per-app volume, so this ducks the default output device. Outputs without a software volume control (most HDMI / DisplayPort) are skipped. The volume is restored on the device that was ducked even if the default output switches mid-hold, and a pre-duck volume left behind by a reload or crash is restored on the next start.
 
-Knobs in `init.lua`: `duckVolume` (default `10`), `holdDelay` (default `0.15`), `pollInterval` (default `0.5`, the fallback re-check of the real modifier state while ducked).
+Knobs in `init.lua`: `duckVolume` (default `20`), `holdDelay` (default `0.15`), `pollInterval` (default `0.5`, the fallback re-check of the real modifier state while ducked).
 
 ### RaiseAllWindows
 
@@ -98,7 +98,7 @@ Prompts are stored as separate text files and can be easily customized.
 | Shortcut | Action |
 |---|---|
 | Cmd+Shift+1 | OCR screen selection to clipboard |
-| Hold Ctrl+Alt | Duck output volume to 10% (VolumeDuck) |
+| Hold Ctrl+Alt | Duck output volume to 20% (VolumeDuck) |
 | Alt+V | Open ClipboardAI |
 | Alt+C | Copy selection + open ClipboardAI |
 | Alt+1 / Alt+B | Chromium (disabled) |

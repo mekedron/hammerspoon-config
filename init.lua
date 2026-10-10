@@ -6,7 +6,7 @@ spoon.AudioSwitcher:start()
 
 hs.loadSpoon("VolumeDuck")
 -- Output volume (percent) while Ctrl+Option is held.
-spoon.VolumeDuck.duckVolume = 10
+spoon.VolumeDuck.duckVolume = 20
 spoon.VolumeDuck:start()
 
 hs.loadSpoon("RaiseAllWindows")
