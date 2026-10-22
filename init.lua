@@ -25,8 +25,14 @@ spoon.MiddleClickRightOption.suppressMiddleClick = true
 -- layers). Re-enable by uncommenting the line below.
 -- spoon.MiddleClickRightOption:start()
 
--- Disabled: mouse modifier layers are not in active use. Re-enable by
--- uncommenting the block below.
+hs.loadSpoon("MouseChords")
+-- Back + Forward held = Control + Option held (VoiceInk push-to-talk).
+-- Middle held + Back / Forward = delete word left / right; with Right also
+-- held = jump one word left / right. Lone side and middle clicks still work.
+spoon.MouseChords:start()
+
+-- Disabled: superseded by MouseChords (both use the side buttons, so never
+-- run them together). Re-enable by uncommenting the block below.
 -- hs.loadSpoon("MouseLayers")
 -- Side-button numbers (vary by mouse; common 5-button convention is back=3,
 -- forward=4). With logButtons = true, reload and click each side button to see

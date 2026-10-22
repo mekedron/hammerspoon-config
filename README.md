@@ -50,9 +50,27 @@ Two knobs in `init.lua`:
 
 A stuck-modifier safety net (`maxHoldSeconds`, default `30`, `0` to disable) force-releases Option if the releasing middle-up never arrives.
 
+### MouseChords
+
+Mouse chords for dictation and word editing, using the side buttons (back / forward) and the wheel (middle) button:
+
+| Hold | Then press | Result |
+| --- | --- | --- |
+| **Back + Forward** together | — | **Control + Option** held until you let go (VoiceInk push-to-talk) |
+| **Middle** | Back | delete the word to the left (⌥Delete) |
+| **Middle** | Forward | delete the word to the right (⌥Fn-Delete) |
+| **Middle + Right** | Back | jump one word left (⌥←) |
+| **Middle + Right** | Forward | jump one word right (⌥→) |
+
+Holding Back or Forward inside the middle layer auto-repeats its key.
+
+Ordinary clicks still work. A lone side click is still back / forward navigation; it waits `chordWindow` seconds (default `0.08`) for the other side button before it goes through. A lone middle click is replayed on release. A middle drag (Blender orbit) goes through as soon as the pointer moves more than `dragThreshold` pixels (default `4`). Right-click is a modifier only while the middle button is held.
+
+Knobs in `init.lua`: `backButton` / `forwardButton` (defaults `3` / `4`), `chordWindow`, `dragThreshold`, `repeatDelay` (default `0.4`), `repeatInterval` (default `0.06`, `0` disables repeat), `maxHoldSeconds` (default `300`, a safety net that releases a stuck Control + Option). The keys live in `spoon.MouseChords.actions`.
+
 ### MouseLayers
 
-> Currently disabled in `init.lua` (not in active use); re-enable by uncommenting its block.
+> Currently disabled in `init.lua`, superseded by **MouseChords**. Both use the side buttons, so never run them together.
 
 Gives the mouse's **side buttons** (normally web back/forward) three roles each, without losing their everyday navigation:
 
