@@ -13,8 +13,10 @@
 --   MIDDLE + RIGHT held
 --     + BACK                jump one word left            (Option+Left)
 --     + FORWARD             jump one word right           (Option+Right)
---   MIDDLE held + wheel     move the cursor one character per wheel step:
+--   MIDDLE held + wheel     jump one word per wheel step:
 --                           up = left, down = right
+--   MIDDLE + RIGHT held
+--     + wheel               move one character per wheel step
 --
 -- Holding a side button inside the middle layer auto-repeats its key, except
 -- undo, which fires once per click.
@@ -109,7 +111,8 @@ obj.invertScroll = false
 --- Keys fired in the middle layer: actions.middle (middle held) and
 --- actions.move (middle + right held), each keyed "back" / "forward";
 --- actions.rightClick (middle held + right click); actions.scroll (middle
---- held + wheel), keyed "up" / "down". `repeats = false` turns off auto-repeat.
+--- held + wheel) and actions.scrollRight (middle + right held + wheel), keyed
+--- "up" / "down". `repeats = false` turns off auto-repeat.
 obj.actions = {
     middle = {
         back    = { mods = {"alt"}, key = "delete" },
@@ -121,6 +124,10 @@ obj.actions = {
     },
     rightClick = { mods = {}, key = "return" },
     scroll = {
+        up   = { mods = {"alt"}, key = "left" },
+        down = { mods = {"alt"}, key = "right" },
+    },
+    scrollRight = {
         up   = { mods = {}, key = "left" },
         down = { mods = {}, key = "right" },
     },
@@ -151,7 +158,7 @@ function obj:_resetState()
     -- used: a chord fired during this middle hold. downAt: press time.
     self._middle = { down = false, used = false, downAt = 0 }
     -- swallowed: the right press belongs to the middle layer. used: a side
-    -- button fired a word jump during it, so its release is not Enter.
+    -- button or the wheel acted during it, so its release is not Enter.
     self._right = { swallowed = false, used = false }
     self._chordHeld = false
     self._lastScrollAction = 0
@@ -356,7 +363,12 @@ function obj:_middleScroll(event)
     if now - self._lastScrollAction < self.scrollInterval then return true end
     self._lastScrollAction = now
     local up = (dy > 0) ~= (self.invertScroll == true)
-    self:_fire(self.actions.scroll[up and "up" or "down"])
+    local layer = self.actions.scroll
+    if self._right.swallowed then
+        self._right.used = true
+        layer = self.actions.scrollRight
+    end
+    self:_fire(layer[up and "up" or "down"])
     return true
 end
 

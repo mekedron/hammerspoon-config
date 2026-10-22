@@ -62,10 +62,10 @@ Mouse chords for dictation and text editing, using the side buttons (back / forw
 | **Middle** | right click | Enter |
 | **Middle + Right** | Back | jump one word left (⌥←) |
 | **Middle + Right** | Forward | jump one word right (⌥→) |
-| **Middle** | wheel up | cursor one character left (←) |
-| **Middle** | wheel down | cursor one character right (→) |
+| **Middle** | wheel up / down | jump one word left / right (⌥← / ⌥→) |
+| **Middle + Right** | wheel up / down | move one character left / right (← / →) |
 
-Holding Back or Forward inside the middle layer auto-repeats its key, except undo, which fires once per click. Each wheel step moves the cursor one character, at most one per `scrollInterval` seconds (default `0.04`); set `invertScroll = true` if the directions come out swapped.
+Holding Back or Forward inside the middle layer auto-repeats its key, except undo, which fires once per click. Each wheel step moves the cursor one word (one character with Right held), at most one step per `scrollInterval` seconds (default `0.04`); set `invertScroll = true` if the directions come out swapped.
 
 The middle button itself always passes through untouched, so middle clicks (closing browser tabs), middle drags (Blender orbit) and PieSwitcher's middle-hold wheel work as usual. PieSwitcher still sees a plain middle hold during a chord and may open its wheel; the spoon closes it by clicking mouse button `pieDismissButton` (default `5`, a button the mouse doesn't have), which PieSwitcher reads as a click outside the wheel. It does that on the first chord action and again `pieHoldDelay` seconds (default `0.25`) after the middle press, in case the wheel opened later.
 
