@@ -8,15 +8,16 @@
 --                           (VoiceInk's push-to-talk). Letting go of either
 --                           releases it.
 --   MIDDLE held + BACK      delete the word to the left   (Option+Delete)
---   MIDDLE held + FORWARD   delete the word to the right  (Option+Fn+Delete)
+--   MIDDLE held + FORWARD   undo                          (Cmd+Z)
 --   MIDDLE + RIGHT held
 --     + BACK                jump one word left            (Option+Left)
 --     + FORWARD             jump one word right           (Option+Right)
 --
---   MIDDLE held + wheel up  undo  (Cmd+Z)
---   MIDDLE held + wheel down  redo  (Cmd+Shift+Z)
+--   MIDDLE held + wheel     move the cursor one character per wheel step:
+--                           up = left, down = right
 --
--- Holding a side button inside the middle layer auto-repeats its key.
+-- Holding a side button inside the middle layer auto-repeats its key, except
+-- undo, which fires once per click.
 --
 -- Everyday use keeps working:
 --   * a lone side click is still back / forward navigation. It is held back
@@ -82,33 +83,33 @@ obj.maxHoldSeconds = 300
 
 --- MouseChords.scrollInterval
 --- Variable
---- Minimum seconds between two undo / redo steps from the wheel (default
---- 0.15), so one wheel notch, or a burst of smooth-scroll events, is one step.
-obj.scrollInterval = 0.15
+--- Minimum seconds between two cursor steps from the wheel (default 0.04), so
+--- a burst of smooth-scroll events doesn't fly across the line.
+obj.scrollInterval = 0.04
 
 --- MouseChords.invertScroll
 --- Variable
---- false: the wheel turn that scrolls a page up undoes. Set true if undo and
---- redo come out swapped with your scroll settings.
+--- false: the wheel turn that scrolls a page up moves the cursor left. Set
+--- true if the directions come out swapped with your scroll settings.
 obj.invertScroll = false
 
 --- MouseChords.actions
 --- Variable
---- Keys fired in the middle layer: actions.delete (middle held),
+--- Keys fired in the middle layer: actions.middle (middle held),
 --- actions.move (middle + right held), each keyed "back" / "forward", and
 --- actions.scroll (middle held + wheel), keyed "up" / "down".
 obj.actions = {
-    delete = {
+    middle = {
         back    = { mods = {"alt"}, key = "delete" },
-        forward = { mods = {"alt"}, key = "forwarddelete" },
+        forward = { mods = {"cmd"}, key = "z", repeats = false },
     },
     move = {
         back    = { mods = {"alt"}, key = "left" },
         forward = { mods = {"alt"}, key = "right" },
     },
     scroll = {
-        up   = { mods = {"cmd"},          key = "z" },
-        down = { mods = {"cmd", "shift"}, key = "z" },
+        up   = { mods = {}, key = "left" },
+        down = { mods = {}, key = "right" },
     },
 }
 
@@ -207,6 +208,7 @@ end
 
 
 function obj:_startRepeat(s, action)
+    if action.repeats == false then return end
     if not (self.repeatInterval and self.repeatInterval > 0) then return end
     s.repeatTimer = hs.timer.doAfter(self.repeatDelay, function()
         s.repeatTimer = hs.timer.doEvery(self.repeatInterval, function()
@@ -223,7 +225,7 @@ function obj:_sideDown(name)
     if self._middle.down then
         self._middle.used = true
         s.mode = "layer"
-        local layer = self._rightSwallowed and self.actions.move or self.actions.delete
+        local layer = self._rightSwallowed and self.actions.move or self.actions.middle
         local action = layer[name]
         self:_fire(action)
         self:_startRepeat(s, action)

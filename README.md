@@ -58,13 +58,13 @@ Mouse chords for dictation and word editing, using the side buttons (back / forw
 | --- | --- | --- |
 | **Back + Forward** together | — | **Control + Option** held until you let go (VoiceInk push-to-talk) |
 | **Middle** | Back | delete the word to the left (⌥Delete) |
-| **Middle** | Forward | delete the word to the right (⌥Fn-Delete) |
+| **Middle** | Forward | undo (⌘Z) |
 | **Middle + Right** | Back | jump one word left (⌥←) |
 | **Middle + Right** | Forward | jump one word right (⌥→) |
-| **Middle** | wheel up | undo (⌘Z) |
-| **Middle** | wheel down | redo (⇧⌘Z) |
+| **Middle** | wheel up | cursor one character left (←) |
+| **Middle** | wheel down | cursor one character right (→) |
 
-Holding Back or Forward inside the middle layer auto-repeats its key. Each wheel step fires one undo / redo, at most one per `scrollInterval` seconds (default `0.15`); set `invertScroll = true` if undo and redo come out swapped.
+Holding Back or Forward inside the middle layer auto-repeats its key, except undo, which fires once per click. Each wheel step moves the cursor one character, at most one per `scrollInterval` seconds (default `0.04`); set `invertScroll = true` if the directions come out swapped.
 
 Ordinary clicks still work. A lone side click is still back / forward navigation; it waits `chordWindow` seconds (default `0.08`) for the other side button before it goes through. A lone middle click is replayed on release. A middle drag (Blender orbit) goes through as soon as the pointer moves more than `dragThreshold` pixels (default `4`). Right-click is a modifier only while the middle button is held.
 
