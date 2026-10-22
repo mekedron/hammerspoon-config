@@ -1,7 +1,7 @@
 -------------------------------------------------------------------------------
 -- MouseChords.spoon
 --
--- Mouse chords for dictation and word editing, built on the side buttons
+-- Mouse chords for dictation and text editing, built on the side buttons
 -- (back / forward) and the wheel (middle) button:
 --
 --   BACK + FORWARD held     Control + Option held for as long as both are held
@@ -9,23 +9,27 @@
 --                           releases it.
 --   MIDDLE held + BACK      delete the word to the left   (Option+Delete)
 --   MIDDLE held + FORWARD   undo                          (Cmd+Z)
+--   MIDDLE held + RIGHT     Enter, on a right click with no side button
 --   MIDDLE + RIGHT held
 --     + BACK                jump one word left            (Option+Left)
 --     + FORWARD             jump one word right           (Option+Right)
---
 --   MIDDLE held + wheel     move the cursor one character per wheel step:
 --                           up = left, down = right
 --
 -- Holding a side button inside the middle layer auto-repeats its key, except
 -- undo, which fires once per click.
 --
+-- The middle button itself always passes through untouched: PieSwitcher opens
+-- its wheel on a middle hold, and middle drags (Blender orbit) must not lag.
+-- The spoon only watches whether it is held. Because PieSwitcher sees a plain
+-- middle hold, it may open its wheel while a chord is in use; the spoon closes
+-- it with a click of an unused mouse button (`pieDismissButton`), which
+-- PieSwitcher treats as a click outside the wheel. Apps ignore that button.
+--
 -- Everyday use keeps working:
 --   * a lone side click is still back / forward navigation. It is held back
 --     for `chordWindow` seconds to see whether the other side button joins,
 --     then replayed;
---   * a lone middle click is replayed on release;
---   * a middle drag (Blender orbit, autoscroll) is replayed as soon as the
---     pointer moves more than `dragThreshold` pixels, so the drag goes through;
 --   * a right press counts as a modifier only while the middle button is
 --     held; otherwise it is untouched.
 --
@@ -58,11 +62,18 @@ obj.forwardButton = 4
 --- land about 30 ms apart.
 obj.chordWindow = 0.08
 
---- MouseChords.dragThreshold
+--- MouseChords.pieDismissButton
 --- Variable
---- Pixels the pointer may move with the middle button held before the press is
---- treated as a middle drag and replayed to the app (default 4).
-obj.dragThreshold = 4
+--- Mouse button number clicked to close PieSwitcher's wheel when a middle
+--- chord is used (default 5, a button the mouse doesn't have). nil disables.
+obj.pieDismissButton = 5
+
+--- MouseChords.pieHoldDelay
+--- Variable
+--- Seconds after the middle press by which PieSwitcher has opened its wheel
+--- (its hold delay plus a margin, default 0.25). A chord used sooner closes
+--- the wheel again once this time is reached.
+obj.pieHoldDelay = 0.25
 
 --- MouseChords.repeatDelay
 --- Variable
@@ -95,9 +106,10 @@ obj.invertScroll = false
 
 --- MouseChords.actions
 --- Variable
---- Keys fired in the middle layer: actions.middle (middle held),
---- actions.move (middle + right held), each keyed "back" / "forward", and
---- actions.scroll (middle held + wheel), keyed "up" / "down".
+--- Keys fired in the middle layer: actions.middle (middle held) and
+--- actions.move (middle + right held), each keyed "back" / "forward";
+--- actions.rightClick (middle held + right click); actions.scroll (middle
+--- held + wheel), keyed "up" / "down". `repeats = false` turns off auto-repeat.
 obj.actions = {
     middle = {
         back    = { mods = {"alt"}, key = "delete" },
@@ -107,6 +119,7 @@ obj.actions = {
         back    = { mods = {"alt"}, key = "left" },
         forward = { mods = {"alt"}, key = "right" },
     },
+    rightClick = { mods = {}, key = "return" },
     scroll = {
         up   = { mods = {}, key = "left" },
         down = { mods = {}, key = "right" },
@@ -135,13 +148,18 @@ function obj:_resetState()
     -- Side button mode: nil (up), "pending" (waiting for a chord), "nav"
     -- (replayed as navigation), "chord" (Control + Option), "layer" (key).
     self._side = { back = {}, forward = {} }
-    self._middle = { down = false, used = false, replayed = false, loc = nil }
-    self._rightSwallowed = false
+    -- used: a chord fired during this middle hold. downAt: press time.
+    self._middle = { down = false, used = false, downAt = 0 }
+    -- swallowed: the right press belongs to the middle layer. used: a side
+    -- button fired a word jump during it, so its release is not Enter.
+    self._right = { swallowed = false, used = false }
     self._chordHeld = false
+    self._lastScrollAction = 0
 end
 
 obj._tap = nil
 obj._holdSafety = nil
+obj._pieTimer = nil
 obj:_resetState()
 
 
@@ -150,9 +168,9 @@ function obj:_buttonNumber(name)
 end
 
 
-function obj:_postMouse(button, isDown, loc)
+function obj:_postMouse(button, isDown)
     local t = isDown and TYPES.otherMouseDown or TYPES.otherMouseUp
-    local e = hs.eventtap.event.newMouseEvent(t, loc or hs.mouse.absolutePosition())
+    local e = hs.eventtap.event.newMouseEvent(t, hs.mouse.absolutePosition())
     e:setProperty(PROPS.mouseEventButtonNumber, button)
     e:setProperty(PROPS.eventSourceUserData, SELF_TAG)
     e:post()
@@ -201,6 +219,39 @@ function obj:_fire(action)
 end
 
 
+function obj:_dismissPie()
+    if not self.pieDismissButton then return end
+    self:_postMouse(self.pieDismissButton, true)
+    self:_postMouse(self.pieDismissButton, false)
+end
+
+
+function obj:_cancelPieTimer()
+    if self._pieTimer then
+        self._pieTimer:stop()
+        self._pieTimer = nil
+    end
+end
+
+
+--- Marks the current middle hold as a chord and closes PieSwitcher's wheel:
+--- now if it is already open, and again once its hold delay has passed if the
+--- chord came before the wheel did.
+function obj:_useMiddle()
+    local m = self._middle
+    if m.used then return end
+    m.used = true
+    self:_dismissPie()
+    local remaining = m.downAt + self.pieHoldDelay - hs.timer.secondsSinceEpoch()
+    if remaining > 0 then
+        self._pieTimer = hs.timer.doAfter(remaining, function()
+            self._pieTimer = nil
+            if self._middle.down then self:_dismissPie() end
+        end)
+    end
+end
+
+
 function obj:_stopTimers(s)
     if s.timer then s.timer:stop(); s.timer = nil end
     if s.repeatTimer then s.repeatTimer:stop(); s.repeatTimer = nil end
@@ -223,9 +274,13 @@ function obj:_sideDown(name)
     self:_stopTimers(s)
 
     if self._middle.down then
-        self._middle.used = true
+        self:_useMiddle()
         s.mode = "layer"
-        local layer = self._rightSwallowed and self.actions.move or self.actions.middle
+        local layer = self.actions.middle
+        if self._right.swallowed then
+            self._right.used = true
+            layer = self.actions.move
+        end
         local action = layer[name]
         self:_fire(action)
         self:_startRepeat(s, action)
@@ -275,52 +330,30 @@ function obj:_sideUp(name)
 end
 
 
-function obj:_middleDown(event)
-    local m = self._middle
-    m.down, m.used, m.replayed = true, false, false
-    m.loc = event:location()
-    -- Replays reuse a copy of the real press so it keeps its event number;
-    -- the window server pairs the real release with it.
-    m.downEvent = event:copy()
-    m.downEvent:setProperty(PROPS.eventSourceUserData, SELF_TAG)
+function obj:_rightDown()
+    if not self._middle.down then return false end
+    self:_useMiddle()
+    self._right.swallowed = true
+    self._right.used = false
     return true
 end
 
 
-function obj:_middleDragged(event)
-    local m = self._middle
-    if not m.down or m.replayed then return false end
-    if m.used then return true end
-    local p = event:location()
-    if math.abs(p.x - m.loc.x) <= self.dragThreshold
-        and math.abs(p.y - m.loc.y) <= self.dragThreshold then
-        return true
-    end
-    -- A real middle drag: replay the press; the following drags and the
-    -- release pass through untouched.
-    m.replayed = true
-    m.downEvent:post()
-    return true
-end
-
-
-function obj:_middleUp()
-    local m = self._middle
-    m.down = false
-    if m.used then return true end
-    if m.replayed then return false end
-    self:_postMouse(MIDDLE_BUTTON, true, m.loc)
-    self:_postMouse(MIDDLE_BUTTON, false, m.loc)
+function obj:_rightUp()
+    local r = self._right
+    if not r.swallowed then return false end
+    r.swallowed = false
+    if not r.used then self:_fire(self.actions.rightClick) end
     return true
 end
 
 
 function obj:_middleScroll(event)
-    self._middle.used = true
+    self:_useMiddle()
     local dy = event:getProperty(PROPS.scrollWheelEventDeltaAxis1)
     if dy == 0 then return true end
     local now = hs.timer.secondsSinceEpoch()
-    if now - (self._lastScrollAction or 0) < self.scrollInterval then return true end
+    if now - self._lastScrollAction < self.scrollInterval then return true end
     self._lastScrollAction = now
     local up = (dy > 0) ~= (self.invertScroll == true)
     self:_fire(self.actions.scroll[up and "up" or "down"])
@@ -338,21 +371,22 @@ function obj:_handle(event)
         if not self._middle.down then return false end
         return self:_middleScroll(event)
     elseif etype == TYPES.rightMouseDown then
-        if not self._middle.down then return false end
-        self._middle.used = true
-        self._rightSwallowed = true
-        return true
+        return self:_rightDown()
     elseif etype == TYPES.rightMouseUp then
-        if not self._rightSwallowed then return false end
-        self._rightSwallowed = false
-        return true
+        return self:_rightUp()
     end
 
     local n = event:getProperty(PROPS.mouseEventButtonNumber)
     if n == MIDDLE_BUTTON then
-        if etype == TYPES.otherMouseDown then return self:_middleDown(event) end
-        if etype == TYPES.otherMouseUp then return self:_middleUp() end
-        return self:_middleDragged(event)
+        local m = self._middle
+        if etype == TYPES.otherMouseDown then
+            m.down, m.used = true, false
+            m.downAt = hs.timer.secondsSinceEpoch()
+        elseif etype == TYPES.otherMouseUp then
+            m.down = false
+            self:_cancelPieTimer()
+        end
+        return false
     end
 
     local name = (n == self.backButton and "back")
@@ -392,6 +426,7 @@ function obj:stop()
         self._tap = nil
     end
     for _, s in pairs(self._side) do self:_stopTimers(s) end
+    self:_cancelPieTimer()
     self:_releaseChord()
     self:_resetState()
     return self
