@@ -35,6 +35,11 @@
 --   * a right press counts as a modifier only while the middle button is
 --     held; otherwise it is untouched.
 --
+-- The tap must sit ahead of PieSwitcher's: once PieSwitcher's wheel is open,
+-- its tap swallows every mouse button until all are released, so a chord
+-- behind it never sees Right or the side buttons. A newer tap goes first, so
+-- the spoon recreates its tap whenever PieSwitcher launches.
+--
 -- Events this spoon posts itself are tagged in eventSourceUserData so the tap
 -- passes them through instead of handling them again.
 -------------------------------------------------------------------------------
@@ -76,6 +81,18 @@ obj.pieDismissButton = 5
 --- (its hold delay plus a margin, default 0.25). A chord used sooner closes
 --- the wheel again once this time is reached.
 obj.pieHoldDelay = 0.25
+
+--- MouseChords.pieSwitcherBundleID
+--- Variable
+--- Bundle id whose launch makes the spoon recreate its tap so it stays ahead
+--- of PieSwitcher's (default "com.mekedron.PieSwitcher"). nil disables.
+obj.pieSwitcherBundleID = "com.mekedron.PieSwitcher"
+
+--- MouseChords.retapDelay
+--- Variable
+--- Seconds after PieSwitcher launches before the tap is recreated, so
+--- PieSwitcher has installed its own tap first (default 3).
+obj.retapDelay = 3
 
 --- MouseChords.repeatDelay
 --- Variable
@@ -167,6 +184,8 @@ end
 obj._tap = nil
 obj._holdSafety = nil
 obj._pieTimer = nil
+obj._appWatcher = nil
+obj._retapTimer = nil
 obj:_resetState()
 
 
@@ -412,17 +431,38 @@ function obj:_handle(event)
 end
 
 
---- MouseChords:start()
---- Method
---- Starts the global mouse event tap.
-function obj:start()
-    self:stop()
+function obj:_startTap()
+    if self._tap then self._tap:stop() end
     self._tap = hs.eventtap.new({
         TYPES.rightMouseDown, TYPES.rightMouseUp,
         TYPES.otherMouseDown, TYPES.otherMouseUp, TYPES.otherMouseDragged,
         TYPES.scrollWheel,
     }, function(e) return self:_handle(e) end)
     self._tap:start()
+end
+
+
+--- MouseChords:start()
+--- Method
+--- Starts the global mouse event tap and the PieSwitcher launch watcher.
+function obj:start()
+    self:stop()
+    self:_startTap()
+    if self.pieSwitcherBundleID then
+        self._appWatcher = hs.application.watcher.new(function(_, event, app)
+            if event ~= hs.application.watcher.launched then return end
+            if not app or app:bundleID() ~= self.pieSwitcherBundleID then return end
+            if self._retapTimer then self._retapTimer:stop() end
+            self._retapTimer = hs.timer.doAfter(self.retapDelay, function()
+                self._retapTimer = nil
+                if self._tap then
+                    self:_startTap()
+                    self.log.i("PieSwitcher launched; tap recreated ahead of it")
+                end
+            end)
+        end)
+        self._appWatcher:start()
+    end
     self.log.i(string.format("started (back=%d, forward=%d)",
         self.backButton, self.forwardButton))
     return self
@@ -433,6 +473,14 @@ end
 --- Method
 --- Stops the event tap, cancels timers and releases a held Control + Option.
 function obj:stop()
+    if self._appWatcher then
+        self._appWatcher:stop()
+        self._appWatcher = nil
+    end
+    if self._retapTimer then
+        self._retapTimer:stop()
+        self._retapTimer = nil
+    end
     if self._tap then
         self._tap:stop()
         self._tap = nil

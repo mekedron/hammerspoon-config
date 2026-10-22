@@ -69,6 +69,8 @@ Holding Back or Forward inside the middle layer auto-repeats its key, except und
 
 The middle button itself always passes through untouched, so middle clicks (closing browser tabs), middle drags (Blender orbit) and PieSwitcher's middle-hold wheel work as usual. PieSwitcher still sees a plain middle hold during a chord and may open its wheel; the spoon closes it by clicking mouse button `pieDismissButton` (default `5`, a button the mouse doesn't have), which PieSwitcher reads as a click outside the wheel. It does that on the first chord action and again `pieHoldDelay` seconds (default `0.25`) after the middle press, in case the wheel opened later.
 
+The spoon's tap must sit ahead of PieSwitcher's: once PieSwitcher's wheel is open, its tap swallows every mouse button until all are released. The newest tap goes first, so the spoon recreates its tap `retapDelay` seconds (default `3`) after PieSwitcher launches (`pieSwitcherBundleID`).
+
 A lone side click is still back / forward navigation; it waits `chordWindow` seconds (default `0.08`) for the other side button before it goes through. Right-click is a modifier only while the middle button is held.
 
 Other knobs in `init.lua`: `backButton` / `forwardButton` (defaults `3` / `4`), `repeatDelay` (default `0.4`), `repeatInterval` (default `0.06`, `0` disables repeat), `maxHoldSeconds` (default `300`, a safety net that releases a stuck Control + Option). The keys live in `spoon.MouseChords.actions`.
