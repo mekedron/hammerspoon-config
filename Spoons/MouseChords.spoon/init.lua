@@ -11,10 +11,10 @@
 --   MIDDLE held + FORWARD   undo                          (Cmd+Z)
 --   MIDDLE held + RIGHT     Enter, on a right click with no side button
 --   MIDDLE + RIGHT held
---     + BACK                jump one word left            (Option+Left)
+--     + BACK                delete one character          (Delete)
 --     + FORWARD             jump one word right           (Option+Right)
 --   MIDDLE held + wheel     jump one word per wheel step:
---                           up = left, down = right
+--                           up = right, down = left
 --   MIDDLE + RIGHT held
 --     + wheel               move one character per wheel step
 --
@@ -102,9 +102,9 @@ obj.scrollInterval = 0.04
 
 --- MouseChords.invertScroll
 --- Variable
---- false: the wheel turn that scrolls a page up moves the cursor left. Set
---- true if the directions come out swapped with your scroll settings.
-obj.invertScroll = false
+--- true: the wheel turn that scrolls a page up moves the cursor right; false
+--- swaps the directions.
+obj.invertScroll = true
 
 --- MouseChords.actions
 --- Variable
@@ -119,7 +119,7 @@ obj.actions = {
         forward = { mods = {"cmd"}, key = "z", repeats = false },
     },
     move = {
-        back    = { mods = {"alt"}, key = "left" },
+        back    = { mods = {}, key = "delete" },
         forward = { mods = {"alt"}, key = "right" },
     },
     rightClick = { mods = {}, key = "return" },
