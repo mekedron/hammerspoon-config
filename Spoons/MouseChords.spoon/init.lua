@@ -13,6 +13,9 @@
 --     + BACK                jump one word left            (Option+Left)
 --     + FORWARD             jump one word right           (Option+Right)
 --
+--   MIDDLE held + wheel up  undo  (Cmd+Z)
+--   MIDDLE held + wheel down  redo  (Cmd+Shift+Z)
+--
 -- Holding a side button inside the middle layer auto-repeats its key.
 --
 -- Everyday use keeps working:
@@ -77,10 +80,23 @@ obj.repeatInterval = 0.06
 --- a button-up is missed (default 300). 0 disables.
 obj.maxHoldSeconds = 300
 
+--- MouseChords.scrollInterval
+--- Variable
+--- Minimum seconds between two undo / redo steps from the wheel (default
+--- 0.15), so one wheel notch, or a burst of smooth-scroll events, is one step.
+obj.scrollInterval = 0.15
+
+--- MouseChords.invertScroll
+--- Variable
+--- false: the wheel turn that scrolls a page up undoes. Set true if undo and
+--- redo come out swapped with your scroll settings.
+obj.invertScroll = false
+
 --- MouseChords.actions
 --- Variable
---- Keys fired in the middle layer: actions.delete (middle held) and
---- actions.move (middle + right held), each keyed "back" / "forward".
+--- Keys fired in the middle layer: actions.delete (middle held),
+--- actions.move (middle + right held), each keyed "back" / "forward", and
+--- actions.scroll (middle held + wheel), keyed "up" / "down".
 obj.actions = {
     delete = {
         back    = { mods = {"alt"}, key = "delete" },
@@ -89,6 +105,10 @@ obj.actions = {
     move = {
         back    = { mods = {"alt"}, key = "left" },
         forward = { mods = {"alt"}, key = "right" },
+    },
+    scroll = {
+        up   = { mods = {"cmd"},          key = "z" },
+        down = { mods = {"cmd", "shift"}, key = "z" },
     },
 }
 
@@ -293,13 +313,29 @@ function obj:_middleUp()
 end
 
 
+function obj:_middleScroll(event)
+    self._middle.used = true
+    local dy = event:getProperty(PROPS.scrollWheelEventDeltaAxis1)
+    if dy == 0 then return true end
+    local now = hs.timer.secondsSinceEpoch()
+    if now - (self._lastScrollAction or 0) < self.scrollInterval then return true end
+    self._lastScrollAction = now
+    local up = (dy > 0) ~= (self.invertScroll == true)
+    self:_fire(self.actions.scroll[up and "up" or "down"])
+    return true
+end
+
+
 function obj:_handle(event)
     if event:getProperty(PROPS.eventSourceUserData) == SELF_TAG then
         return false
     end
     local etype = event:getType()
 
-    if etype == TYPES.rightMouseDown then
+    if etype == TYPES.scrollWheel then
+        if not self._middle.down then return false end
+        return self:_middleScroll(event)
+    elseif etype == TYPES.rightMouseDown then
         if not self._middle.down then return false end
         self._middle.used = true
         self._rightSwallowed = true
@@ -336,6 +372,7 @@ function obj:start()
     self._tap = hs.eventtap.new({
         TYPES.rightMouseDown, TYPES.rightMouseUp,
         TYPES.otherMouseDown, TYPES.otherMouseUp, TYPES.otherMouseDragged,
+        TYPES.scrollWheel,
     }, function(e) return self:_handle(e) end)
     self._tap:start()
     self.log.i(string.format("started (back=%d, forward=%d)",

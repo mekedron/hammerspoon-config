@@ -28,7 +28,8 @@ spoon.MiddleClickRightOption.suppressMiddleClick = true
 hs.loadSpoon("MouseChords")
 -- Back + Forward held = Control + Option held (VoiceInk push-to-talk).
 -- Middle held + Back / Forward = delete word left / right; with Right also
--- held = jump one word left / right. Lone side and middle clicks still work.
+-- held = jump one word left / right. Middle held + wheel up / down = undo /
+-- redo. Lone side and middle clicks still work.
 spoon.MouseChords:start()
 
 -- Disabled: superseded by MouseChords (both use the side buttons, so never
